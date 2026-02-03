@@ -245,18 +245,24 @@ function Execute-SchoologyRequest {
         [string] $Body,
         [string] $Uri
     )
+
+    $Authorization = (`
+        'OAuth realm="Schoology API",' +
+        'oauth_consumer_key="{0}",' +
+        'oauth_token="",' +
+        'oauth_nonce="{1}",' +
+        'oauth_timestamp="{2}",' +
+        'oauth_signature_method="PLAINTEXT",' +
+        'oauth_version="1.0",' +
+        'oauth_signature="{3}&"') `
+            -f  $SystemParams.clientKey,
+                ((New-Guid).Guid -replace '-'),
+                [int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s),
+                $SystemParams.clientSecret
+
     $splat = @{
         Headers = @{
-                                "Authorization" = @"
-OAuth realm="Schoology API",
-oauth_consumer_key="$($SystemParams.clientKey)",
-oauth_token="",
-oauth_nonce="$((New-Guid).guid -replace '-')",
-oauth_timestamp="$([int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s))",
-oauth_signature_method="PLAINTEXT",
-oauth_version="1.0",
-oauth_signature="$($SystemParams.clientSecret + '&')"
-"@ -replace "\r\n"
+            "Authorization" = $Authorization
             "Accept" = "application/json"
             "Content-Type" = "application/json"
         }
@@ -310,6 +316,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                     else {
                         Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
                     }
+                    Log info ($splat | ConvertTo-Json)
                     $response = Invoke-RestMethod @splat -ErrorAction Stop
                     break
             } catch {
