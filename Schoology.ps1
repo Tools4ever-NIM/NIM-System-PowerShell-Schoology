@@ -1,9 +1,10 @@
 #
-# HappyFox.ps1 - HappyFox
+# Schoology.ps1 - Schoology
 #
 $Log_MaskableKeys = @(
     'Password',
-    "proxy_password"
+    "proxy_password",
+    'clientSecret'
 )
 
 $Global:UsersCacheTime = Get-Date
