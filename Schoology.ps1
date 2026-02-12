@@ -246,7 +246,8 @@ function Execute-SchoologyRequest {
         [string] $Uri
     )
 
-    $Authorization = (`
+    function get-auth(){
+            $Authorization = (`
         'OAuth realm="Schoology API",' +
         'oauth_consumer_key="{0}",' +
         'oauth_token="",' +
@@ -260,9 +261,15 @@ function Execute-SchoologyRequest {
                 [int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s),
                 $SystemParams.clientSecret
 
+        return $Authorization   
+
+    }
+
+
+
     $splat = @{
         Headers = @{
-            "Authorization" = $Authorization
+            "Authorization" = get-auth
             "Accept" = "application/json"
             "Content-Type" = "application/json"
         }
@@ -317,8 +324,28 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                         Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
                     }
                     Log info ($splat | ConvertTo-Json)
-                    $response = Invoke-RestMethod @splat -ErrorAction Stop
-                    break
+                    $responseData = [System.Collections.Generic.List[psobject]]::new()
+                   do{
+                        $response = Invoke-RestMethod @splat -ErrorAction Stop
+                        if($null -eq $response.links.next -or $response.links.next.length -lt 1){
+                            break
+                        }
+                        else{
+                                foreach($rowItem in $response.user) {
+                                    [void]$responseData.Add($rowItem)
+                                }
+                            
+                            $splat['Uri'] = $response.links.next
+                            Write-Host $splat.uri
+                            $splat['Headers'] =  @{
+                                "Authorization" = get-auth
+                                "Accept" = "application/json"
+                                "Content-Type" = "application/json"
+                            }
+                        }
+                    }while($true)
+                  
+
             } catch {
                     $statusCode = $_.Exception.Response.StatusCode.value__
                     if ($statusCode -eq 429) {
@@ -335,17 +362,10 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
             }
         } while ($true)
 
-        if ($null -eq $response.page_info.page_count) {
-            return $response
+        if ($null -eq $response.links.next -or $response.links.next.length -lt 1) {
+            return $responsedata
         }
 
-        $response.data
-
-        if ($response.page_info.page_count -eq $splat['Body'].Page) {
-            break
-        }
-
-        $splat['Body'].Page++
     } while ($true)
 }
 
