@@ -202,6 +202,7 @@ function Idm-UsersRead {
                     Method = "GET"
                     Uri = $uri                    
                     Body = $null
+                    ResponseProperty = 'user'
                 }
 
                 
@@ -238,38 +239,40 @@ function Idm-UsersRead {
 #
 #   Internal Functions
 #
+function Get-SchoologyAuthorization {
+    param (
+        [hashtable] $SystemParams
+    )
+        $Authorization = (`
+    'OAuth realm="Schoology API",' +
+    'oauth_consumer_key="{0}",' +
+    'oauth_token="",' +
+    'oauth_nonce="{1}",' +
+    'oauth_timestamp="{2}",' +
+    'oauth_signature_method="PLAINTEXT",' +
+    'oauth_version="1.0",' +
+    'oauth_signature="{3}&"') `
+        -f  $SystemParams.clientKey,
+            ((New-Guid).Guid -replace '-'),
+            [int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s),
+            $SystemParams.clientSecret
+
+    return $Authorization   
+
+}
+
 function Execute-SchoologyRequest {
     param (
         [hashtable] $SystemParams,
         [string] $Method,
         [string] $Body,
-        [string] $Uri
+        [string] $Uri,
+        [string] $ResponseProperty
     )
-
-    function get-auth(){
-            $Authorization = (`
-        'OAuth realm="Schoology API",' +
-        'oauth_consumer_key="{0}",' +
-        'oauth_token="",' +
-        'oauth_nonce="{1}",' +
-        'oauth_timestamp="{2}",' +
-        'oauth_signature_method="PLAINTEXT",' +
-        'oauth_version="1.0",' +
-        'oauth_signature="{3}&"') `
-            -f  $SystemParams.clientKey,
-                ((New-Guid).Guid -replace '-'),
-                [int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s),
-                $SystemParams.clientSecret
-
-        return $Authorization   
-
-    }
-
-
 
     $splat = @{
         Headers = @{
-            "Authorization" = get-auth
+            "Authorization" = Get-SchoologyAuthorization $SystemParams
             "Accept" = "application/json"
             "Content-Type" = "application/json"
         }
@@ -282,7 +285,7 @@ function Execute-SchoologyRequest {
     } else {
         $splat["Body"] = @{
             page = 1
-            size = 50
+            limit = 50
         }
     }
 
@@ -310,37 +313,35 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
     }
 
     do {
+        $responseData = [System.Collections.ArrayList]@()
         $attempt = 0
         $retryDelay = $SystemParams.retryDelay
         do {
             try {
-                    $attemptSuffix = if ($attempt -gt 0) { " (Attempt $($attempt + 1))" } else { "" }
+                    do{    
+                        $attemptSuffix = if ($attempt -gt 0) { " (Attempt $($attempt + 1))" } else { "" }
 
-                    if ($Method -eq "GET" -and $splat["Body"]) {
-                        $queryParams = ($splat["Body"].GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
-                        Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix"
-                    }
-                    else {
-                        Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
-                    }
-                    Log info ($splat | ConvertTo-Json)
-                    $responseData = [System.Collections.Generic.List[psobject]]::new()
-                   do{
+                        if ($Method -eq "GET" -and $splat["Body"]) {
+                            $queryParams = ($splat["Body"].GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
+                            Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix"
+                        }
+                        else {
+                            Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
+                        }
+                   
                         $response = Invoke-RestMethod @splat -ErrorAction Stop
                         if($null -eq $response.links.next -or $response.links.next.length -lt 1){
                             break
                         }
                         else{
-                                foreach($rowItem in $response.user) {
-                                    [void]$responseData.Add($rowItem)
-                                }
-                            
-                            $splat['Uri'] = $response.links.next
-                            Write-Host $splat.uri
-                            $splat['Headers'] =  @{
-                                "Authorization" = get-auth
-                                "Accept" = "application/json"
-                                "Content-Type" = "application/json"
+                                $responseData.AddRange(@() + $response.$ResponseProperty)
+                                $splat.Uri = $response.links.next
+                                $splat.Body = $null
+
+                                $splat.Headers = @{
+                                    "Authorization" = Get-SchoologyAuthorization $SystemParams
+                                    "Accept" = "application/json"
+                                    "Content-Type" = "application/json"
                             }
                         }
                     }while($true)
@@ -348,7 +349,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 
             } catch {
                     $statusCode = $_.Exception.Response.StatusCode.value__
-                    if ($statusCode -eq 429) {
+                    if ($statusCode -eq 429 -or $statusCode -eq 401) {
                         $attempt++
                         if ($attempt -ge $SystemParams.nr_of_retries) {
                             throw "Max retry attempts reached for $Uri"
@@ -363,10 +364,12 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
         } while ($true)
 
         if ($null -eq $response.links.next -or $response.links.next.length -lt 1) {
-            return $responsedata
+            break
         }
 
     } while ($true)
+
+    return $responseData
 }
 
 function Get-ClassMetaData {
