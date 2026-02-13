@@ -8,9 +8,33 @@ $Log_MaskableKeys = @(
 )
 
 $Global:UsersCacheTime = Get-Date
+$Global:CoursesCacheTime = Get-Date
+$Global:GroupsCacheTime = Get-Date
+$Global:SectionsCacheTime = Get-Date
+$Global:SchoolsCacheTime = Get-Date
+$Global:GroupEnrollmentsCacheTime = Get-Date
 $Global:Users = [System.Collections.ArrayList]@()
+$Global:Courses = [System.Collections.ArrayList]@()
+$Global:Groups = [System.Collections.ArrayList]@()
+$Global:Schools = [System.Collections.ArrayList]@()
+$Global:Sections = [System.Collections.ArrayList]@()
+$Global:GroupEnrollments = [System.Collections.ArrayList]@()
 
 $Properties = @{
+    Schools = @(
+        @{ name = 'id';           				    options = @('default','key')} 
+        @{ name = 'title';           				    options = @('default')}    
+        @{ name = 'address1';           			options = @('default')}
+        @{ name = 'address2';           		        options = @('default')}
+        @{ name = 'city';           			options = @('default')}
+        @{ name = 'state';           			options = @('default')}
+        @{ name = 'postal_code';           		options = @('default')}
+        @{ name = 'country';           			options = @('default')}
+        @{ name = 'website';           options = @('default')}
+        @{ name = 'phone';       options = @('default')}
+        @{ name = 'fax';           			options = @('default')}
+        @{ name = 'building_code';           	options = @('default')}
+    )
     Users = @(
         @{ name = 'uid';           				    options = @('default','key')}    
         @{ name = 'id';           				    options = @('default')}    
@@ -66,7 +90,7 @@ $Properties = @{
         @{name ="grade_level_range_end";                options = @('default')}
 
     )
-    CourseSections = @(
+    Sections = @(
         @{name ="id";                                   options = @('default','key')}
         @{ name = 'course_title';           				    options = @('default')}
         @{ name = 'course_code';           				    options = @('default')}
@@ -87,7 +111,7 @@ $Properties = @{
 
 
     )
-    Enrollments = @(
+    GroupEnrollments = @(
         @{name ="id";                                   options = @('default','key')}
         @{ name = 'uid';           				    options = @('default')}
         @{ name = 'school_uid';           				    options = @('default')}
@@ -99,6 +123,7 @@ $Properties = @{
         @{ name = 'name_display';           				    options = @('default')}
         @{ name = 'status';           				    options = @('default')}
     )
+
 }
 
 #
@@ -230,6 +255,67 @@ function Idm-OnUnload {
 # Object CRUD functions
 #
 
+
+<#
+Note: Testing currently and this only seems to pull in the initial school and not all schools. 
+#>
+function Idm-SchoolsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Schools'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+
+            if(     $Global:Schools.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:SchoolsCacheTime) -gt (new-timespan -minutes 5) ) 
+            ) {   
+
+                $uri = "v1/schools"
+                
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'schools'
+                }
+
+                $Global:Schools.Add(@() + (Execute-SchoologyRequest @splat).school )
+                $Global:SchoolsCacheTime = Get-Date
+            }
+            
+            $properties = ($Global:Properties.$Class).name
+                $hash_table = [ordered]@{}
+
+                foreach ($prop in $properties.GetEnumerator()) {
+                    $hash_table[$prop] = ""
+                }
+
+                foreach($rowItem in $Global:Schools) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            
+        }
+}
+
 function Idm-UsersRead {
     param (
         # Mode
@@ -305,8 +391,8 @@ function Idm-GroupsRead {
             
         } else {
 
-            if(     $Global:Users.count -lt 1 `
-                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            if(     $Global:Groups.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:GroupsCacheTime) -gt (new-timespan -minutes 5) ) 
             ) {   
 
                 $uri = "v1/groups"
@@ -319,8 +405,8 @@ function Idm-GroupsRead {
                     ResponseProperty = 'group'
                 }
 
-                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
-                $Global:UsersCacheTime = Get-Date
+                $Global:Groups.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:GroupsCacheTime = Get-Date
             }
             
             $properties = ($Global:Properties.$Class).name
@@ -362,8 +448,8 @@ function Idm-CoursesRead {
             
         } else {
 
-            if(     $Global:Users.count -lt 1 `
-                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            if(     $Global:Courses.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:CoursesCacheTime) -gt (new-timespan -minutes 5) ) 
             ) {   
 
                 $uri = "v1/courses"
@@ -376,8 +462,8 @@ function Idm-CoursesRead {
                     ResponseProperty = 'course'
                 }
 
-                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
-                $Global:UsersCacheTime = Get-Date
+                $Global:Courses.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:CoursesCacheTime = Get-Date
             }
             
             $properties = ($Global:Properties.$Class).name
@@ -387,7 +473,7 @@ function Idm-CoursesRead {
                     $hash_table[$prop] = ""
                 }
 
-                foreach($rowItem in $Global:Users) {
+                foreach($rowItem in $Global:Courses) {
                     $row = New-Object -TypeName PSObject -Property $hash_table
 
                     foreach($prop in $rowItem.PSObject.properties) {
@@ -401,8 +487,7 @@ function Idm-CoursesRead {
         }
 }
 
-
-function Idm-EnrollmentsRead {
+function Idm-SectionsRead {
     param (
         # Mode
         [switch] $GetMeta,    
@@ -413,29 +498,33 @@ function Idm-EnrollmentsRead {
     )
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
-        $Class = 'Enrollments'
+        $Class = 'Sections'
         
         if ($GetMeta) {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
             
         } else {
 
-            if(     $Global:Users.count -lt 1 `
-                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            if(     $Global:Courses.count -gt 1 `
+                    -or ( ((Get-Date) - $Global:SectionsCacheTime) -gt (new-timespan -minutes 5) ) 
             ) {   
 
-                $uri = "v1/enrollments"
+                foreach($Course in $Global:Courses){
+                    $uri = ("v1/courses/{0}/sections" -f $course.id)
                 
-                $splat = @{
-                    SystemParams = $system_params
-                    Method = "GET"
-                    Uri = $uri                    
-                    Body = $null
-                    ResponseProperty = 'enrollments'
-                }
+                    $splat = @{
+                        SystemParams = $system_params
+                        Method = "GET"
+                        Uri = $uri                    
+                        Body = $null
+                        ResponseProperty = 'section'
+                    }
+                    $Global:Sections.Add((Execute-SchoologyRequest @splat))
+                
 
-                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
-                $Global:UsersCacheTime = Get-Date
+
+                }
+                $Global:SectionsCacheTime = Get-Date
             }
             
             $properties = ($Global:Properties.$Class).name
@@ -445,7 +534,7 @@ function Idm-EnrollmentsRead {
                     $hash_table[$prop] = ""
                 }
 
-                foreach($rowItem in $Global:Users) {
+                foreach($rowItem in $Global:Sections) {
                     $row = New-Object -TypeName PSObject -Property $hash_table
 
                     foreach($prop in $rowItem.PSObject.properties) {
@@ -458,6 +547,71 @@ function Idm-EnrollmentsRead {
             
         }
 }
+
+function Idm-GroupEnrollmentsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'GroupEnrollments'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+
+            if(     $Global:Groups.count -gt 0 `
+                    -or ( ((Get-Date) - $Global:GroupEnrollmentsCacheTime) -gt (new-timespan -minutes 5) ) 
+            ) {   
+
+                foreach($Group in $Global:Groups){
+                    $uri = ("v1/groups/{0}/enrollments" -f $Group.id)
+                
+                    $splat = @{
+                        SystemParams = $system_params
+                        Method = "GET"
+                        Uri = $uri                    
+                        Body = $null
+                        ResponseProperty = 'groupenrollments'
+                    }
+                    break
+                    $test = (Execute-SchoologyRequest @splat)
+                    Write-Host $test
+                    $Global:GroupEnrollments.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                     
+
+
+                }
+                $Global:GroupEnrollmentsCacheTime = Get-Date
+            }
+            
+            $properties = ($Global:Properties.$Class).name
+                $hash_table = [ordered]@{}
+
+                foreach ($prop in $properties.GetEnumerator()) {
+                    $hash_table[$prop] = ""
+                }
+
+                foreach($rowItem in $Global:GroupEnrollments) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            
+        }
+}
+
 
 #
 #   Internal Functions
