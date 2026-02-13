@@ -205,13 +205,7 @@ function Idm-UsersRead {
                     ResponseProperty = 'user'
                 }
 
-                
-                $response = Execute-SchoologyRequest @splat
-                
-                foreach($rowItem in $response.user) {
-                    [void]$Global:Users.Add($rowItem)
-                }
-
+                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
                 $Global:UsersCacheTime = Get-Date
             }
             
@@ -312,61 +306,56 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
         }
     }
 
+    $responseData = [System.Collections.ArrayList]@()
+    $attempt = 0
+    $retryDelay = $SystemParams.retryDelay
     do {
-        $responseData = [System.Collections.ArrayList]@()
-        $attempt = 0
-        $retryDelay = $SystemParams.retryDelay
-        do {
-            try {
-                    do{    
-                        $attemptSuffix = if ($attempt -gt 0) { " (Attempt $($attempt + 1))" } else { "" }
+        try {
+                do{    
+                    $attemptSuffix = if ($attempt -gt 0) { " (Attempt $($attempt + 1))" } else { "" }
 
-                        if ($Method -eq "GET" -and $splat["Body"]) {
-                            $queryParams = ($splat["Body"].GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
-                            Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix"
-                        }
-                        else {
-                            Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
-                        }
-                   
-                        $response = Invoke-RestMethod @splat -ErrorAction Stop
-                        if($null -eq $response.links.next -or $response.links.next.length -lt 1){
-                            break
-                        }
-                        else{
-                                $responseData.AddRange(@() + $response.$ResponseProperty)
-                                $splat.Uri = $response.links.next
-                                $splat.Body = $null
-
-                                $splat.Headers = @{
-                                    "Authorization" = Get-SchoologyAuthorization $SystemParams
-                                    "Accept" = "application/json"
-                                    "Content-Type" = "application/json"
-                            }
-                        }
-                    }while($true)
-                  
-
-            } catch {
-                    $statusCode = $_.Exception.Response.StatusCode.value__
-                    if ($statusCode -eq 429 -or $statusCode -eq 401) {
-                        $attempt++
-                        if ($attempt -ge $SystemParams.nr_of_retries) {
-                            throw "Max retry attempts reached for $Uri"
-                        }
-                        Log warning "Received $statusCode. Retrying in $retryDelay seconds..."
-                        Start-Sleep -Seconds $retryDelay
-                        $retryDelay *= 2  # Exponential backoff
-                    } else {
-                        throw  # Rethrow for other errors
+                    if ($Method -eq "GET" -and $splat["Body"]) {
+                        $queryParams = ($splat["Body"].GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
+                        Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix"
                     }
-            }
-        } while ($true)
+                    else {
+                        Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
+                    }
+                    
+                    $splat.Headers = @{
+                            "Authorization" = Get-SchoologyAuthorization $SystemParams
+                            "Accept" = "application/json"
+                            "Content-Type" = "application/json"
+                    }
 
-        if ($null -eq $response.links.next -or $response.links.next.length -lt 1) {
-            break
+                    $response = Invoke-RestMethod @splat -ErrorAction Stop
+                    $responseData.AddRange(@() + $response.$ResponseProperty)
+
+                    if($null -eq $response.links.next -or $response.links.next.length -lt 1){
+                        break
+                    }
+                    else{
+                            $splat.Uri = $response.links.next
+                            $splat.Body = $null 
+                    }
+                }while($true)
+                
+
+        } catch {
+                $statusCode = $_.Exception.Response.StatusCode.value__
+                if ($statusCode -eq 429 -or $statusCode -eq 401 -or $statusCode -eq 500) {
+                    $attempt++
+                    if ($attempt -ge $SystemParams.nr_of_retries) {
+                        throw "Max retry attempts reached for $Uri"
+                    }
+                    Log warning "Received $statusCode. Retrying in $retryDelay seconds..."
+                    Start-Sleep -Seconds $retryDelay
+                    $retryDelay *= 2  # Exponential backoff
+                } else {
+                    throw  # Rethrow for other errors
+                }
         }
-
+        break
     } while ($true)
 
     return $responseData
