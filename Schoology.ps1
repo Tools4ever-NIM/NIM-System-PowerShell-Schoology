@@ -12,35 +12,92 @@ $Global:Users = [System.Collections.ArrayList]@()
 
 $Properties = @{
     Users = @(
-        @{ name = 'uid';           						    options = @('default','key')}    
-        @{ name = 'id';           				options = @('default')}    
-        @{ name = 'school_id';           					options = @('default')}
-        @{ name = 'synced';           		            options = @('default')}
-        @{ name = 'school_uid';           				options = @('default')}
-        @{ name = 'name_title';           				options = @('default')}
-        @{ name = 'name_title_show';           				options = @('default')}
-        @{ name = 'name_first';           				options = @('default')}
-        @{ name = 'name_first_preferred';           				options = @('default')}
-        @{ name = 'use_preferred_first_name';           				options = @('default')}
-        @{ name = 'name_middle';           				options = @('default')}
-        @{ name = 'name_middle_show';           				options = @('default')}
-        @{ name = 'name_last';           				options = @('default')}
-        @{ name = 'name_display';           				options = @('default')}
-        @{ name = 'username';           				options = @('default')}
-        @{ name = 'primary_email';           				options = @('default')}
-        @{ name = 'picture_url';           				options = @('default')}
+        @{ name = 'uid';           				    options = @('default','key')}    
+        @{ name = 'id';           				    options = @('default')}    
+        @{ name = 'school_id';           			options = @('default')}
+        @{ name = 'synced';           		        options = @('default')}
+        @{ name = 'school_uid';           			options = @('default')}
+        @{ name = 'name_title';           			options = @('default')}
+        @{ name = 'name_title_show';           		options = @('default')}
+        @{ name = 'name_first';           			options = @('default')}
+        @{ name = 'name_first_preferred';           options = @('default')}
+        @{ name = 'use_preferred_first_name';       options = @('default')}
+        @{ name = 'name_middle';           			options = @('default')}
+        @{ name = 'name_middle_show';           	options = @('default')}
+        @{ name = 'name_last';           			options = @('default')}
+        @{ name = 'name_display';           		options = @('default')}
+        @{ name = 'username';           		    options = @('default')}
+        @{ name = 'primary_email';           		options = @('default')}
+        @{ name = 'picture_url';           			options = @('default')}
         @{ name = 'gender';           				options = @('default')}
-        @{ name = 'position';           				options = @('default')}
-        @{ name = 'grad_year';           				options = @('default')}
-        @{ name = 'password';           				options = @('default')}
+        @{ name = 'position';           			options = @('default')}
+        @{ name = 'grad_year';           			options = @('default')}
+        @{ name = 'password';           			options = @('default')}
         @{ name = 'role_id';           				options = @('default')}
-        @{ name = 'tz_offset';           				options = @('default')}
+        @{ name = 'tz_offset';           			options = @('default')}
         @{ name = 'tz_name';           				options = @('default')}
         @{ name = 'parents';           				options = @('default')}
-        @{ name = 'child_uids';           				options = @('default')}
-        @{ name = 'language';           				options = @('default')}
-        @{ name = 'additional_buildings';           				options = @('default')}
-        @{ name = 'parent_access_code';           				options = @('default')}
+        @{ name = 'child_uids';           			options = @('default')}
+        @{ name = 'language';           			options = @('default')}
+        @{ name = 'additional_buildings';           options = @('default')}
+        @{ name = 'parent_access_code';           	options = @('default')}
+    )
+    Groups = @(
+        @{name ="id";                                   options = @('default','key')}
+        @{name ="title";                                   options = @('default')}
+        @{name ="description";                                   options = @('default')}
+        @{name ="website";                                   options = @('default')}
+        @{name ="access_code";                                   options = @('default')}
+        @{name ="category";                                   options = @('default')}
+        @{name ="group_code";                                   options = @('default')}
+        @{name ="school_id";                                   options = @('default')}
+        @{name ="building_id";                                   options = @('default')}
+    )
+    Courses =@(
+        @{name ="id";                                   options = @('default','key')}
+        @{name ="title";                                options = @('default')}
+        @{name ="course_code";                          options = @('default')}
+        @{name ="department";                           options = @('default')}
+        @{name ="description";                          options = @('default')}
+        @{name ="credits";                              options = @('default')}
+        @{name ="subject_area";                         options = @('default')}
+        @{name ="building_id";                          options = @('default')}
+        @{name ="grade_level_range_start";              options = @('default')}
+        @{name ="grade_level_range_end";                options = @('default')}
+
+    )
+    CourseSections = @(
+        @{name ="id";                                   options = @('default','key')}
+        @{ name = 'course_title';           				    options = @('default')}
+        @{ name = 'course_code';           				    options = @('default')}
+        @{ name = 'course_id';           				    options = @('default')}
+        @{ name = 'school_id';           				    options = @('default')}
+        @{ name = 'access_code';           				    options = @('default')}
+        @{ name = 'section_title';           				    options = @('default')}
+        @{ name = 'section_code';           				    options = @('default')}
+        @{ name = 'section_school_code';           				    options = @('default')}
+        @{ name = 'active';           				    options = @('default')}
+        @{ name = 'description';           				    options = @('default')}
+        @{ name = 'location';           				    options = @('default')}
+        @{ name = 'meeting_days';           				    options = @('default')}
+        @{ name = 'start_time';           				    options = @('default')}
+        @{ name = 'end_time';           				    options = @('default')}
+        @{ name = 'weight';           				    options = @('default')}
+        @{ name = 'admin';           				    options = @('default')}
+
+
+    )
+    Enrollments = @(
+        @{name ="id";                                   options = @('default','key')}
+        @{ name = 'uid';           				    options = @('default')}
+        @{ name = 'school_uid';           				    options = @('default')}
+        @{ name = 'name_title';           				    options = @('default')}
+        @{ name = 'name_first';           				    options = @('default')}
+        @{ name = 'name_first_preferred';           				    options = @('default')}
+        @{ name = 'name_middle';           				    options = @('default')}
+        @{ name = 'name_last';           				    options = @('default')}
+        @{ name = 'name_display';           				    options = @('default')}
+        @{ name = 'status';           				    options = @('default')}
     )
 }
 
@@ -203,6 +260,178 @@ function Idm-UsersRead {
                     Uri = $uri                    
                     Body = $null
                     ResponseProperty = 'user'
+                }
+
+                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:UsersCacheTime = Get-Date
+            }
+            
+            $properties = ($Global:Properties.$Class).name
+                $hash_table = [ordered]@{}
+
+                foreach ($prop in $properties.GetEnumerator()) {
+                    $hash_table[$prop] = ""
+                }
+
+                foreach($rowItem in $Global:Users) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            
+        }
+}
+
+function Idm-GroupsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Groups'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+
+            if(     $Global:Users.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            ) {   
+
+                $uri = "v1/groups"
+                
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'group'
+                }
+
+                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:UsersCacheTime = Get-Date
+            }
+            
+            $properties = ($Global:Properties.$Class).name
+                $hash_table = [ordered]@{}
+
+                foreach ($prop in $properties.GetEnumerator()) {
+                    $hash_table[$prop] = ""
+                }
+
+                foreach($rowItem in $Global:Users) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            
+        }
+}
+
+function Idm-CoursesRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Courses'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+
+            if(     $Global:Users.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            ) {   
+
+                $uri = "v1/courses"
+                
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'course'
+                }
+
+                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:UsersCacheTime = Get-Date
+            }
+            
+            $properties = ($Global:Properties.$Class).name
+                $hash_table = [ordered]@{}
+
+                foreach ($prop in $properties.GetEnumerator()) {
+                    $hash_table[$prop] = ""
+                }
+
+                foreach($rowItem in $Global:Users) {
+                    $row = New-Object -TypeName PSObject -Property $hash_table
+
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
+            
+        }
+}
+
+
+function Idm-EnrollmentsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Enrollments'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+
+            if(     $Global:Users.count -lt 1 `
+                    -or ( ((Get-Date) - $Global:UsersCacheTime) -gt (new-timespan -minutes 5) ) 
+            ) {   
+
+                $uri = "v1/enrollments"
+                
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'enrollments'
                 }
 
                 $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
