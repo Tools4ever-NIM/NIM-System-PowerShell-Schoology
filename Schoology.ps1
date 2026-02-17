@@ -580,12 +580,8 @@ function Idm-GroupEnrollmentsRead {
                         Body = $null
                         ResponseProperty = 'groupenrollments'
                     }
-                    break
-                    $test = (Execute-SchoologyRequest @splat)
-                    Write-Host $test
-                    $Global:GroupEnrollments.AddRange(@() + (Execute-SchoologyRequest @splat) )
-                     
 
+                    $Global:GroupEnrollments.AddRange(@() + (Execute-SchoologyRequest @splat) )
 
                 }
                 $Global:GroupEnrollmentsCacheTime = Get-Date
