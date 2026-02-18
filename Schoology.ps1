@@ -12,13 +12,11 @@ $Global:CoursesCacheTime = Get-Date
 $Global:GroupsCacheTime = Get-Date
 $Global:SectionsCacheTime = Get-Date
 $Global:SchoolsCacheTime = Get-Date
-$Global:GroupEnrollmentsCacheTime = Get-Date
 $Global:Users = [System.Collections.ArrayList]@()
 $Global:Courses = [System.Collections.ArrayList]@()
 $Global:Groups = [System.Collections.ArrayList]@()
 $Global:Schools = [System.Collections.ArrayList]@()
 $Global:Sections = [System.Collections.ArrayList]@()
-$Global:GroupEnrollments = [System.Collections.ArrayList]@()
 
 $Properties = @{
     Schools = @(
@@ -66,17 +64,6 @@ $Properties = @{
         @{ name = 'additional_buildings';           options = @('default')}
         @{ name = 'parent_access_code';           	options = @('default')}
     )
-    Groups = @(
-        @{name ="id";                                   options = @('default','key')}
-        @{name ="title";                                   options = @('default')}
-        @{name ="description";                                   options = @('default')}
-        @{name ="website";                                   options = @('default')}
-        @{name ="access_code";                                   options = @('default')}
-        @{name ="category";                                   options = @('default')}
-        @{name ="group_code";                                   options = @('default')}
-        @{name ="school_id";                                   options = @('default')}
-        @{name ="building_id";                                   options = @('default')}
-    )
     Courses =@(
         @{name ="id";                                   options = @('default','key')}
         @{name ="title";                                options = @('default')}
@@ -108,14 +95,27 @@ $Properties = @{
         @{ name = 'end_time';           				    options = @('default')}
         @{ name = 'weight';           				    options = @('default')}
         @{ name = 'admin';           				    options = @('default')}
-
-
+    )
+    Groups = @(
+        @{ name = "id";                                   options = @('default','key')}
+        @{ name = 'title';           				    options = @('default')}
+        @{ name = 'description';           				    options = @('default')}
+        @{ name = 'website';           				    options = @('default')}
+        @{ name = 'access_code';           				    options = @('default')}
+        @{ name = 'category';           				    options = @('default')}
+        @{ name = 'options';           				    options = @('default')}
+        @{ name = 'group_code';           				    options = @('default')}
+        @{ name = 'privacy_level';           				    options = @('default')}
+        @{ name = 'picture_url';           				    options = @('default')}
+        @{ name = 'school_id';           				    options = @('default')}
+        @{ name = 'building_id';           				    options = @('default')}
     )
     GroupEnrollments = @(
-        @{name ="id";                                   options = @('default','key')}
+        @{ name ="id";                                   options = @('default','key')}
         @{ name = 'uid';           				    options = @('default')}
         @{ name = 'school_uid';           				    options = @('default')}
         @{ name = 'name_title';           				    options = @('default')}
+        @{ name = 'name_title_show';           				    options = @('default')}
         @{ name = 'name_first';           				    options = @('default')}
         @{ name = 'name_first_preferred';           				    options = @('default')}
         @{ name = 'name_middle';           				    options = @('default')}
@@ -123,7 +123,6 @@ $Properties = @{
         @{ name = 'name_display';           				    options = @('default')}
         @{ name = 'status';           				    options = @('default')}
     )
-
 }
 
 #
@@ -221,6 +220,13 @@ function Idm-SystemInfo {
                 value = 2
             }
             @{
+                name = 'nr_of_threads'
+                type = 'textbox'
+                label = 'Max. number of simultaneous requests'
+                description = ''
+                value = 2
+            }
+            @{
                 name = 'nr_of_sessions'
                 type = 'textbox'
                 label = 'Max. number of simultaneous sessions'
@@ -296,22 +302,22 @@ function Idm-SchoolsRead {
             }
             
             $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
+            $hash_table = [ordered]@{}
 
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $Global:Schools) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
                 }
 
-                foreach($rowItem in $Global:Schools) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
+                $row
+            }
             
         }
 }
@@ -353,22 +359,22 @@ function Idm-UsersRead {
             }
             
             $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
+            $hash_table = [ordered]@{}
 
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $Global:Users) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
                 }
 
-                foreach($rowItem in $Global:Users) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
+                $row
+            }
             
         }
 }
@@ -410,22 +416,22 @@ function Idm-GroupsRead {
             }
             
             $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
+            $hash_table = [ordered]@{}
 
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $Global:Groups) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
                 }
 
-                foreach($rowItem in $Global:Users) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
+                $row
+            }
             
         }
 }
@@ -467,22 +473,22 @@ function Idm-CoursesRead {
             }
             
             $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
+            $hash_table = [ordered]@{}
 
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $Global:Courses) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
                 }
 
-                foreach($rowItem in $Global:Courses) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
+                $row
+            }
             
         }
 }
@@ -528,22 +534,22 @@ function Idm-SectionsRead {
             }
             
             $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
+            $hash_table = [ordered]@{}
 
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $Global:Sections) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
                 }
 
-                foreach($rowItem in $Global:Sections) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
+                $row
+            }
             
         }
 }
@@ -563,49 +569,115 @@ function Idm-GroupEnrollmentsRead {
         
         if ($GetMeta) {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
-            
-        } else {
+            return
+        }
 
-            if(     $Global:Groups.count -gt 0 `
-                    -or ( ((Get-Date) - $Global:GroupEnrollmentsCacheTime) -gt (new-timespan -minutes 5) ) 
-            ) {   
+        # Refresh cache if needed
+        if ($Global:Groups.Count -eq 0) {
+            Idm-GroupsRead -SystemParams $SystemParams -FunctionParams $FunctionParams | Out-Null
+        }
 
-                foreach($Group in $Global:Groups){
-                    $uri = ("v1/groups/{0}/enrollments" -f $Group.id)
+        # Precompute property template
+        $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+        $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+        $template = [ordered]@{}
+        foreach ($prop in $properties.Name) {
+            $template[$prop] = $null
+        }
+
+        # Prepare runspace pool
+        $cancellationSource = [System.Threading.CancellationTokenSource]::new()
+        $cancellationToken = $cancellationSource.Token
+        $system_params.CancellationSource = $cancellationSource
+
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+        $runspacePool.Open()
+        $runspaces = @()
+
+        # Index for tracking
+        $index = 0
+        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
+        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        foreach($item in $Global:Groups){
+            if ($Global:CancellationSource.IsCancellationRequested) {
+                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
+                break
+            }
+
+            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
+                param($item, $system_params, $Class, $index)
                 
-                    $splat = @{
-                        SystemParams = $system_params
-                        Method = "GET"
-                        Uri = $uri                    
-                        Body = $null
-                        ResponseProperty = 'groupenrollments'
-                    }
-
-                    $Global:GroupEnrollments.AddRange(@() + (Execute-SchoologyRequest @splat) )
-
+                $itemResult = @{
+                    rows = [System.Collections.ArrayList]@()
+                    logMessage = $null
                 }
-                $Global:GroupEnrollmentsCacheTime = Get-Date
+
+                $uri = ("v1/groups/{0}/enrollments" -f $item.id)
+            
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'enrollment'
+                    LogMessage = "[$($item.ID)]"
+                    LoggingEnabled = $false
+                }
+
+                try {
+                    $response = Execute-SchoologyRequest @splat
+                } catch {
+                    $itemResult.logMessage = "Retrieve Group Memberships [$($item.ID)] - $_"
+                    return $itemResult
+                }
+
+                [void]$itemResult.rows.AddRange(@() + $response)
+                return $itemResult
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+    
+            $runspace.RunspacePool = $runspacePool
+            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $index++
+        }
+
+        # Collect results
+        $total = $runspaces.Count
+        $completed = 0
+
+        $result = [System.Collections.ArrayList]@()
+        foreach ($r in $runspaces) {
+            $output = $r.Pipe.EndInvoke($r.Status)
+            $completed++
+
+            if ($completed % 50 -eq 0 -or $completed -eq $total) {
+                $percent = [math]::Round(($completed / $total) * 100, 2)
+                Log info "Progress: [$completed/$total] requests completed ($percent%)"
+            }
+
+            if($null -ne $output.logMessage) {
+                Log verbose $output.logMessage
+            }
+
+            foreach($rowItem in $output.rows) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.Name.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                [void]$result.Add($row)
             }
             
-            $properties = ($Global:Properties.$Class).name
-                $hash_table = [ordered]@{}
-
-                foreach ($prop in $properties.GetEnumerator()) {
-                    $hash_table[$prop] = ""
-                }
-
-                foreach($rowItem in $Global:GroupEnrollments) {
-                    $row = New-Object -TypeName PSObject -Property $hash_table
-
-                    foreach($prop in $rowItem.PSObject.properties) {
-                        if(!$properties.contains($prop.Name)) { continue }
-                        $row.($prop.Name) = $prop.Value
-                    }
-
-                    $row
-                }
-            
+            $r.Pipe.Dispose()
         }
+
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+
+        # Final output
+        $result
 }
 
 
@@ -640,7 +712,9 @@ function Execute-SchoologyRequest {
         [string] $Method,
         [string] $Body,
         [string] $Uri,
-        [string] $ResponseProperty
+        [string] $ResponseProperty,
+        [string] $LogMessage,
+        [boolean] $LoggingEnabled = $true
     )
 
     $splat = @{
@@ -695,10 +769,10 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 
                     if ($Method -eq "GET" -and $splat["Body"]) {
                         $queryParams = ($splat["Body"].GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
-                        Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix"
+                        if($LoggingEnabled) { Log verbose "$($splat.Method) Call: $($splat.Uri)?$queryParams$attemptSuffix" }
                     }
                     else {
-                        Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix"
+                        if($LoggingEnabled) { Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix" }
                     }
                     
                     $splat.Headers = @{
@@ -722,12 +796,20 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 
         } catch {
                 $statusCode = $_.Exception.Response.StatusCode.value__
+                
+                if ($statusCode -eq 503) {
+                    if ($null -ne $Global:CancellationSource) {
+                        $Global:CancellationSource.Cancel()
+                    }
+                    throw "503 Service Unavailable - Cancelling all requests. - $($_)"
+                }
+
                 if ($statusCode -eq 429 -or $statusCode -eq 401 -or $statusCode -eq 500) {
                     $attempt++
                     if ($attempt -ge $SystemParams.nr_of_retries) {
                         throw "Max retry attempts reached for $Uri"
                     }
-                    Log warning "Received $statusCode. Retrying in $retryDelay seconds..."
+                    if($LoggingEnabled) { Log warning "Received $statusCode. Retrying in $retryDelay seconds..." }
                     Start-Sleep -Seconds $retryDelay
                     $retryDelay *= 2  # Exponential backoff
                 } else {
