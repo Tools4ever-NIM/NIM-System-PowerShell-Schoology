@@ -123,6 +123,52 @@ $Properties = @{
         @{ name = 'name_display';           				    options = @('default')}
         @{ name = 'status';           				    options = @('default')}
     )
+    SectionEnrollments = @(
+        @{ name ="id";                                   options = @('default','key')}
+        @{ name = 'uid';           				    options = @('default')}
+        @{ name = 'school_uid';           				    options = @('default')}
+        @{ name = 'name_title';           				    options = @('default')}
+        @{ name = 'name_title_show';           				    options = @('default')}
+        @{ name = 'name_first';           				    options = @('default')}
+        @{ name = 'name_first_preferred';           				    options = @('default')}
+        @{ name = 'name_middle';           				    options = @('default')}
+        @{ name = 'name_last';           				    options = @('default')}
+        @{ name = 'name_display';           				    options = @('default')}
+        @{ name = 'status';           				    options = @('default')}
+    )
+    SectionEvents = @(
+        @{ name ="id";                                   options = @('default','key')}
+        @{ name = 'title';           				    options = @('default')}
+        @{ name = 'description';           				    options = @('default')}
+        @{ name = 'start';           				    options = @('default')}
+        @{ name = 'has_end';           				    options = @('default')}
+        @{ name = 'end';           				    options = @('default')}
+        @{ name = 'all_day';           				    options = @('default')}
+        @{ name = 'editable';           				    options = @('default')}
+        @{ name = 'rsvp';           				    options = @('default')}
+        @{ name = 'comments_enabled';           				    options = @('default')}
+        @{ name = 'type';           				    options = @('default')}
+        @{ name = 'realm';           				    options = @('default')}
+        @{ name = 'section_id';           				    options = @('default')}
+
+    )
+  GroupEvents = @(
+        @{ name ="id";                                   options = @('default','key')}
+        @{ name = 'title';           				    options = @('default')}
+        @{ name = 'description';           				    options = @('default')}
+        @{ name = 'start';           				    options = @('default')}
+        @{ name = 'has_end';           				    options = @('default')}
+        @{ name = 'end';           				    options = @('default')}
+        @{ name = 'all_day';           				    options = @('default')}
+        @{ name = 'editable';           				    options = @('default')}
+        @{ name = 'rsvp';           				    options = @('default')}
+        @{ name = 'comments_enabled';           				    options = @('default')}
+        @{ name = 'type';           				    options = @('default')}
+        @{ name = 'realm';           				    options = @('default')}
+        @{ name = 'group_id';           				    options = @('default')}
+
+    )
+    
 }
 
 #
@@ -680,6 +726,261 @@ function Idm-GroupEnrollmentsRead {
         $result
 }
 
+function Idm-SectionEnrollmentsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'SectionEnrollments'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            return
+        }
+
+        # Refresh cache if needed
+        if ($Global:Groups.Count -eq 0) {
+            Idm-GroupsRead -SystemParams $SystemParams -FunctionParams $FunctionParams | Out-Null
+        }
+
+        # Precompute property template
+        $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+        $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+        $template = [ordered]@{}
+        foreach ($prop in $properties.Name) {
+            $template[$prop] = $null
+        }
+
+        # Prepare runspace pool
+        $cancellationSource = [System.Threading.CancellationTokenSource]::new()
+        $cancellationToken = $cancellationSource.Token
+        $system_params.CancellationSource = $cancellationSource
+
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+        $runspacePool.Open()
+        $runspaces = @()
+
+        # Index for tracking
+        $index = 0
+        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
+        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        foreach($item in $Global:Sections){
+            if ($Global:CancellationSource.IsCancellationRequested) {
+                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
+                break
+            }
+
+            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
+                param($item, $system_params, $Class, $index)
+                
+                $itemResult = @{
+                    rows = [System.Collections.ArrayList]@()
+                    logMessage = $null
+                }
+
+                $uri = ("v1/section/{0}/enrollments" -f $item.id)
+            
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'enrollment'
+                    LogMessage = "[$($item.ID)]"
+                    LoggingEnabled = $false
+                }
+
+                try {
+                    $response = Execute-SchoologyRequest @splat
+                } catch {
+                    $itemResult.logMessage = "Retrieve Section Memberships [$($item.ID)] - $_"
+                    return $itemResult
+                }
+
+                [void]$itemResult.rows.AddRange(@() + $response)
+                return $itemResult
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+    
+            $runspace.RunspacePool = $runspacePool
+            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $index++
+        }
+
+        # Collect results
+        $total = $runspaces.Count
+        $completed = 0
+
+        $result = [System.Collections.ArrayList]@()
+        foreach ($r in $runspaces) {
+            $output = $r.Pipe.EndInvoke($r.Status)
+            $completed++
+
+            if ($completed % 50 -eq 0 -or $completed -eq $total) {
+                $percent = [math]::Round(($completed / $total) * 100, 2)
+                Log info "Progress: [$completed/$total] requests completed ($percent%)"
+            }
+
+            if($null -ne $output.logMessage) {
+                Log verbose $output.logMessage
+            }
+
+            foreach($rowItem in $output.rows) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.Name.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                [void]$result.Add($row)
+            }
+            
+            $r.Pipe.Dispose()
+        }
+
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+
+        # Final output
+        $result
+}
+
+function Idm-GroupEventsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'GroupEvents'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            return
+        }
+
+        # Refresh cache if needed
+        if ($Global:Groups.Count -eq 0) {
+            Idm-GroupsRead -SystemParams $SystemParams -FunctionParams $FunctionParams | Out-Null
+        }
+
+        # Precompute property template
+        $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+        $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+        $template = [ordered]@{}
+        foreach ($prop in $properties.Name) {
+            $template[$prop] = $null
+        }
+
+        # Prepare runspace pool
+        $cancellationSource = [System.Threading.CancellationTokenSource]::new()
+        $cancellationToken = $cancellationSource.Token
+        $system_params.CancellationSource = $cancellationSource
+
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+        $runspacePool.Open()
+        $runspaces = @()
+
+        # Index for tracking
+        $index = 0
+        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
+        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        foreach($item in $Global:Groups){
+            if ($Global:CancellationSource.IsCancellationRequested) {
+                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
+                break
+            }
+
+            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
+                param($item, $system_params, $Class, $index)
+                
+                $itemResult = @{
+                    rows = [System.Collections.ArrayList]@()
+                    logMessage = $null
+                }
+
+                $uri = ("v1/groups/{0}/events" -f $item.id)
+            
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'events'
+                    LogMessage = "[$($item.ID)]"
+                    LoggingEnabled = $false
+                }
+
+                try {
+                    $response = Execute-SchoologyRequest @splat
+                    
+                } catch {
+                    $itemResult.logMessage = "Retrieve Section Events [$($item.ID)] - $_"
+                    return $itemResult
+                }
+
+                [void]$itemResult.rows.AddRange(@() + $response)
+                return $itemResult
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+    
+            $runspace.RunspacePool = $runspacePool
+            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $index++
+        }
+
+        # Collect results
+        $total = $runspaces.Count
+        $completed = 0
+
+        $result = [System.Collections.ArrayList]@()
+        foreach ($r in $runspaces) {
+            $output = $r.Pipe.EndInvoke($r.Status)
+            $completed++
+
+            if ($completed % 50 -eq 0 -or $completed -eq $total) {
+                $percent = [math]::Round(($completed / $total) * 100, 2)
+                Log info "Progress: [$completed/$total] requests completed ($percent%)"
+            }
+
+            if($null -ne $output.logMessage) {
+                Log verbose $output.logMessage
+            }
+
+            foreach($rowItem in $output.rows) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.Name.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                [void]$result.Add($row)
+            }
+            
+            $r.Pipe.Dispose()
+        }
+
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+
+        # Final output
+        $result
+}
+
+
+
 
 #
 #   Internal Functions
@@ -782,6 +1083,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                     }
 
                     $response = Invoke-RestMethod @splat -ErrorAction Stop
+                    
                     $responseData.AddRange(@() + $response.$ResponseProperty)
 
                     if($null -eq $response.links.next -or $response.links.next.length -lt 1){
