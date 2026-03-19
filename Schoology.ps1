@@ -1,3 +1,4 @@
+#
 # Schoology.ps1 - Schoology
 #
 $Log_MaskableKeys = @(
@@ -95,14 +96,14 @@ $Properties = @{
     )
     Groups = @(
         @{ name = "id";                                   options = @('default','key')}
-        @{ name = 'title';           				    options = @('default')}
-        @{ name = 'description';           				    options = @('default')}
-        @{ name = 'website';           				    options = @('default')}
+        @{ name = 'title';           				    options = @('default','create_m','update_o')}
+        @{ name = 'description';           				    options = @('default','create_o','update_o')}
+        @{ name = 'website';           				    options = @('default','create_o','update_o')}
         @{ name = 'access_code';           				    options = @('default')}
-        @{ name = 'category';           				    options = @('default')}
+        @{ name = 'category';           				    options = @('default','create_o','update_o')}
         @{ name = 'options';           				    options = @('default')}
         @{ name = 'group_code';           				    options = @('default')}
-        @{ name = 'privacy_level';           				    options = @('default')}
+        @{ name = 'privacy_level';           				    options = @('default','create_o','update_o')}
         @{ name = 'picture_url';           				    options = @('default')}
         @{ name = 'school_id';           				    options = @('default')}
         @{ name = 'building_id';           				    options = @('default')}
@@ -1080,7 +1081,7 @@ function Idm-UsersCreate {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = "/v1/users"
+        $uri = "v1/users"
 
         $splat = @{
             SystemParams = $system_params
@@ -1096,6 +1097,61 @@ function Idm-UsersCreate {
     Log info "Done"
 }
 
+function Idm-GroupsCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Groups'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/groups"
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
 
 
 #
