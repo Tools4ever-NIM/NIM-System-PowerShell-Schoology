@@ -21,16 +21,16 @@ $Global:Sections = [System.Collections.ArrayList]@()
 $Properties = @{
     Schools = @(
         @{ name = 'id';           				    options = @('default','key')} 
-        @{ name = 'title';           				    options = @('default')}    
-        @{ name = 'address1';           			options = @('default')}
-        @{ name = 'address2';           		        options = @('default')}
-        @{ name = 'city';           			options = @('default')}
-        @{ name = 'state';           			options = @('default')}
-        @{ name = 'postal_code';           		options = @('default')}
-        @{ name = 'country';           			options = @('default')}
-        @{ name = 'website';           options = @('default')}
-        @{ name = 'phone';       options = @('default')}
-        @{ name = 'fax';           			options = @('default')}
+        @{ name = 'title';           				    options = @('default','create_m','update_o')}    
+        @{ name = 'address1';           			options = @('default','create_o','update_o')}
+        @{ name = 'address2';           		        options = @('default','create_o','update_o')}
+        @{ name = 'city';           			options = @('default','create_o','update_o')}
+        @{ name = 'state';           			options = @('default','create_o','update_o')}
+        @{ name = 'postal_code';           		options = @('default','create_o','update_o')}
+        @{ name = 'country';           			options = @('default','create_o','update_o')}
+        @{ name = 'website';           options = @('default','create_o','update_o')}
+        @{ name = 'phone';       options = @('default','create_o','update_o')}
+        @{ name = 'fax';           			options = @('default','create_o','update_o')}
         @{ name = 'building_code';           	options = @('default')}
     )
     Users = @(
@@ -64,10 +64,10 @@ $Properties = @{
     )
     Courses =@(
         @{name ="id";                                   options = @('default','key')}
-        @{name ="title";                                options = @('default')}
-        @{name ="course_code";                          options = @('default')}
-        @{name ="department";                           options = @('default')}
-        @{name ="description";                          options = @('default')}
+        @{name ="title";                                options = @('default','create_m','update_o')}
+        @{name ="course_code";                          options = @('default','create_m','update_o')}
+        @{name ="department";                           options = @('default','create_o','update_o')}
+        @{name ="description";                          options = @('default','create_o','update_o')}
         @{name ="credits";                              options = @('default')}
         @{name ="subject_area";                         options = @('default')}
         @{name ="building_id";                          options = @('default')}
@@ -1138,6 +1138,118 @@ function Idm-GroupsCreate {
         $function_params = ConvertFrom-Json2 $FunctionParams
 
         $uri = "v1/groups"
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-CoursesCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Courses'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/courses"
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SchoolsCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Schools'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/schools"
 
         $splat = @{
             SystemParams = $system_params
