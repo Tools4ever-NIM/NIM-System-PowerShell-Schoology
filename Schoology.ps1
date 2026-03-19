@@ -37,28 +37,28 @@ $Properties = @{
         @{ name = 'id';           				    options = @('default')}    
         @{ name = 'school_id';           			options = @('default')}
         @{ name = 'synced';           		        options = @('default')}
-        @{ name = 'school_uid';           			options = @('default','create')}
-        @{ name = 'name_title';           			options = @('default','create','update')}
+        @{ name = 'school_uid';           			options = @('default','create_m')}
+        @{ name = 'name_title';           			options = @('default','create','update_o')}
         @{ name = 'name_title_show';           		options = @('default')}
-        @{ name = 'name_first';           			options = @('default','create','update')}
-        @{ name = 'name_first_preferred';           options = @('default','create','update')}
+        @{ name = 'name_first';           			options = @('default','create_m','update_o')}
+        @{ name = 'name_first_preferred';           options = @('default','create_o','update_o')}
         @{ name = 'use_preferred_first_name';       options = @('default')}
-        @{ name = 'name_middle';           			options = @('default','create','update')}
+        @{ name = 'name_middle';           			options = @('default','create_o','update_o')}
         @{ name = 'name_middle_show';           	options = @('default','create','update')}
-        @{ name = 'name_last';           			options = @('default','create','update')}
+        @{ name = 'name_last';           			options = @('default','create_m','update_o')}
         @{ name = 'name_display';           		options = @('default')}
-        @{ name = 'username';           		    options = @('default','create','update')}
-        @{ name = 'primary_email';           		options = @('default','create','update')}
-        @{ name = 'gender';           				options = @('default','create','update')}
-        @{ name = 'position';           			options = @('default','create','update')}
-        @{ name = 'grad_year';           			options = @('default','create','update')}
-        @{ name = 'password';           			options = @('default','create','update')}
-        @{ name = 'role_id';           				options = @('default','create','update')}
-        @{ name = 'parents';           				options = @('default','create','update')}
-        @{ name = 'parent_uids';           			options = @('default','create','update')} 
-        @{ name = 'child_uids';           			options = @('default','create','update')}
-        @{ name = 'language';           			options = @('default','create','update')}
-        @{ name = 'additional_buildings';           options = @('default','create','update')}
+        @{ name = 'username';           		    options = @('default','create_o','update_o')}
+        @{ name = 'primary_email';           		options = @('default','create_o','update_o')}
+        @{ name = 'gender';           				options = @('default','create_o','update_o')}
+        @{ name = 'position';           			options = @('default','create_o','update_o')}
+        @{ name = 'grad_year';           			options = @('default','create_o','update_o')}
+        @{ name = 'password';           			options = @('default','create_o','update_o')}
+        @{ name = 'role_id';           				options = @('default','create_m','update_o')}
+        @{ name = 'parents';           				options = @('default','create_o','update_o')}
+        @{ name = 'parent_uids';           			options = @('default','create_o','update_o')} 
+        @{ name = 'child_uids';           			options = @('default','create_o','update_o')}
+        @{ name = 'language';           			options = @('default','create_o','update_o')}
+        @{ name = 'additional_buildings';           options = @('default','create_o','update_o')}
         @{ name = 'parent_access_code';           	options = @('default')}
     )
     Courses =@(
@@ -1059,11 +1059,15 @@ function Idm-UsersCreate {
         @{
             semantics = 'create'
             parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create') } | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
