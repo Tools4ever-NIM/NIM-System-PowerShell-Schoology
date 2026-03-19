@@ -1,4 +1,3 @@
-#
 # Schoology.ps1 - Schoology
 #
 $Log_MaskableKeys = @(
@@ -38,30 +37,28 @@ $Properties = @{
         @{ name = 'id';           				    options = @('default')}    
         @{ name = 'school_id';           			options = @('default')}
         @{ name = 'synced';           		        options = @('default')}
-        @{ name = 'school_uid';           			options = @('default')}
-        @{ name = 'name_title';           			options = @('default')}
+        @{ name = 'school_uid';           			options = @('default','create')}
+        @{ name = 'name_title';           			options = @('default','create','update')}
         @{ name = 'name_title_show';           		options = @('default')}
-        @{ name = 'name_first';           			options = @('default')}
-        @{ name = 'name_first_preferred';           options = @('default')}
+        @{ name = 'name_first';           			options = @('default','create','update')}
+        @{ name = 'name_first_preferred';           options = @('default','create','update')}
         @{ name = 'use_preferred_first_name';       options = @('default')}
-        @{ name = 'name_middle';           			options = @('default')}
-        @{ name = 'name_middle_show';           	options = @('default')}
-        @{ name = 'name_last';           			options = @('default')}
+        @{ name = 'name_middle';           			options = @('default','create','update')}
+        @{ name = 'name_middle_show';           	options = @('default','create','update')}
+        @{ name = 'name_last';           			options = @('default','create','update')}
         @{ name = 'name_display';           		options = @('default')}
-        @{ name = 'username';           		    options = @('default')}
-        @{ name = 'primary_email';           		options = @('default')}
-        @{ name = 'picture_url';           			options = @('default')}
-        @{ name = 'gender';           				options = @('default')}
-        @{ name = 'position';           			options = @('default')}
-        @{ name = 'grad_year';           			options = @('default')}
-        @{ name = 'password';           			options = @('default')}
-        @{ name = 'role_id';           				options = @('default')}
-        @{ name = 'tz_offset';           			options = @('default')}
-        @{ name = 'tz_name';           				options = @('default')}
-        @{ name = 'parents';           				options = @('default')}
-        @{ name = 'child_uids';           			options = @('default')}
-        @{ name = 'language';           			options = @('default')}
-        @{ name = 'additional_buildings';           options = @('default')}
+        @{ name = 'username';           		    options = @('default','create','update')}
+        @{ name = 'primary_email';           		options = @('default','create','update')}
+        @{ name = 'gender';           				options = @('default','create','update')}
+        @{ name = 'position';           			options = @('default','create','update')}
+        @{ name = 'grad_year';           			options = @('default','create','update')}
+        @{ name = 'password';           			options = @('default','create','update')}
+        @{ name = 'role_id';           				options = @('default','create','update')}
+        @{ name = 'parents';           				options = @('default','create','update')}
+        @{ name = 'parent_uids';           			options = @('default','create','update')} 
+        @{ name = 'child_uids';           			options = @('default','create','update')}
+        @{ name = 'language';           			options = @('default','create','update')}
+        @{ name = 'additional_buildings';           options = @('default','create','update')}
         @{ name = 'parent_access_code';           	options = @('default')}
     )
     Courses =@(
@@ -554,52 +551,116 @@ function Idm-SectionsRead {
         
         if ($GetMeta) {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
-            
-        } else {
+            return
+        }
 
-            if(     $Global:Courses.count -gt 1 `
-                    -or ( ((Get-Date) - $Global:SectionsCacheTime) -gt (new-timespan -minutes 5) ) 
-            ) {   
+        # Refresh cache if needed
+        if ($Global:Groups.Count -eq 0) {
+            Idm-GroupsRead -SystemParams $SystemParams -FunctionParams $FunctionParams | Out-Null
+        }
 
-                foreach($Course in $Global:Courses){
-                    $uri = ("v1/courses/{0}/sections" -f $course.id)
+        # Precompute property template
+        $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+        $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+        $template = [ordered]@{}
+        foreach ($prop in $properties.Name) {
+            $template[$prop] = $null
+        }
+
+        # Prepare runspace pool
+        $cancellationSource = [System.Threading.CancellationTokenSource]::new()
+        $cancellationToken = $cancellationSource.Token
+        $system_params.CancellationSource = $cancellationSource
+
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+        $runspacePool.Open()
+        $runspaces = @()
+
+        # Index for tracking
+        $index = 0
+        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
+        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        foreach($item in $Global:Courses){
+            if ($Global:CancellationSource.IsCancellationRequested) {
+                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
+                break
+            }
+
+            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
+                param($item, $system_params, $Class, $index)
                 
-                    $splat = @{
-                        SystemParams = $system_params
-                        Method = "GET"
-                        Uri = $uri                    
-                        Body = $null
-                        ResponseProperty = 'section'
-                    }
-                    $Global:Sections.Add((Execute-SchoologyRequest @splat))
-                
-
-
+                $itemResult = @{
+                    rows = [System.Collections.ArrayList]@()
+                    logMessage = $null
                 }
-                $Global:SectionsCacheTime = Get-Date
-            }
+
+                $uri = ("v1/courses/{0}/sections" -f $item.id)
             
-            $properties = ($Global:Properties.$Class).name
-            $hash_table = [ordered]@{}
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'section'
+                    LogMessage = "[$($item.ID)]"
+                    LoggingEnabled = $false
+                }
 
-            foreach ($prop in $properties.GetEnumerator()) {
-                $hash_table[$prop] = ""
+                try {
+                    $response = Execute-SchoologyRequest @splat
+                } catch {
+                    $itemResult.logMessage = "Retrieve Course Sections [$($item.ID)] - $_"
+                    return $itemResult
+                }
+
+                [void]$itemResult.rows.AddRange(@() + $response)
+                return $itemResult
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+    
+            $runspace.RunspacePool = $runspacePool
+            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $index++
+        }
+
+        # Collect results
+        $total = $runspaces.Count
+        $completed = 0
+
+        $result = [System.Collections.ArrayList]@()
+        foreach ($r in $runspaces) {
+            $output = $r.Pipe.EndInvoke($r.Status)
+            $completed++
+
+            if ($completed % 50 -eq 0 -or $completed -eq $total) {
+                $percent = [math]::Round(($completed / $total) * 100, 2)
+                Log info "Progress: [$completed/$total] requests completed ($percent%)"
             }
 
-            foreach($rowItem in $Global:Sections) {
-                $row = New-Object -TypeName PSObject -Property $hash_table
+            if($null -ne $output.logMessage) {
+                Log verbose $output.logMessage
+            }
 
+            foreach($rowItem in $output.rows) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
                 foreach($prop in $rowItem.PSObject.properties) {
-                    if(!$properties.contains($prop.Name)) { continue }
+                    if(!$properties.Name.contains($prop.Name)) { continue }
                     $row.($prop.Name) = $prop.Value
                 }
 
-                $row
+                [void]$result.Add($row)
             }
             
+            $r.Pipe.Dispose()
         }
-}
 
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+
+        # Final output
+        $result
+}
 function Idm-GroupEnrollmentsRead {
     param (
         # Mode
@@ -919,7 +980,7 @@ function Idm-GroupEventsRead {
                     Method = "GET"
                     Uri = $uri                    
                     Body = $null
-                    ResponseProperty = 'events'
+                    ResponseProperty = 'event'
                     LogMessage = "[$($item.ID)]"
                     LoggingEnabled = $false
                 }
@@ -979,6 +1040,57 @@ function Idm-GroupEventsRead {
         $result
 }
 
+function Idm-UsersCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Users'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "/v1/users"
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
 
 
 
@@ -1098,7 +1210,7 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 
         } catch {
                 $statusCode = $_.Exception.Response.StatusCode.value__
-                
+                Write-Host $_.Exception.Response.StatusCode.value__
                 if ($statusCode -eq 503) {
                     if ($null -ne $Global:CancellationSource) {
                         $Global:CancellationSource.Cancel()
