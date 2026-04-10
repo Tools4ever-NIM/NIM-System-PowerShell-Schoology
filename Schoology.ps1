@@ -1,4 +1,3 @@
-#
 # Schoology.ps1 - Schoology
 #
 $Log_MaskableKeys = @(
@@ -20,6 +19,20 @@ $Global:Sections = [System.Collections.ArrayList]@()
 
 $Properties = @{
     Schools = @(
+        @{ name = 'id';           				    options = @('default','key')} 
+        @{ name = 'title';           				    options = @('default','create_m','update_o')}    
+        @{ name = 'address1';           			options = @('default','create_o','update_o')}
+        @{ name = 'address2';           		        options = @('default','create_o','update_o')}
+        @{ name = 'city';           			options = @('default','create_o','update_o')}
+        @{ name = 'state';           			options = @('default','create_o','update_o')}
+        @{ name = 'postal_code';           		options = @('default','create_o','update_o')}
+        @{ name = 'country';           			options = @('default','create_o','update_o')}
+        @{ name = 'website';           options = @('default','create_o','update_o')}
+        @{ name = 'phone';       options = @('default','create_o','update_o')}
+        @{ name = 'fax';           			options = @('default','create_o','update_o')}
+        @{ name = 'building_code';           	options = @('default')}
+    )
+    Buildings = @(
         @{ name = 'id';           				    options = @('default','key')} 
         @{ name = 'title';           				    options = @('default','create_m','update_o')}    
         @{ name = 'address1';           			options = @('default','create_o','update_o')}
@@ -79,7 +92,7 @@ $Properties = @{
         @{name ="id";                                   options = @('default','key')}
         @{ name = 'course_title';           				    options = @('default')}
         @{ name = 'course_code';           				    options = @('default')}
-        @{ name = 'course_id';           				    options = @('default')}
+        @{ name = 'course_id';           				    options = @('default','create_m')}
         @{ name = 'school_id';           				    options = @('default')}
         @{ name = 'access_code';           				    options = @('default')}
         @{ name = 'section_title';           				    options = @('default')}
@@ -307,8 +320,17 @@ function Idm-OnUnload {
 
 
 <#
-Note: Testing currently and this only seems to pull in the initial school and not all schools. 
+Note: You can only Retrieve Schools by ID and cant pull them in as a list 
+
+
+
+
+
+
 #>
+
+# Read Functions Begin
+
 function Idm-SchoolsRead {
     param (
         # Mode
@@ -338,10 +360,10 @@ function Idm-SchoolsRead {
                     Method = "GET"
                     Uri = $uri                    
                     Body = $null
-                    ResponseProperty = 'schools'
+                    ResponseProperty = 'school'
                 }
+                ((Execute-SchoologyRequest @splat).school )
 
-                $Global:Schools.Add(@() + (Execute-SchoologyRequest @splat).school )
                 $Global:SchoolsCacheTime = Get-Date
             }
             
@@ -365,6 +387,134 @@ function Idm-SchoolsRead {
             
         }
 }
+
+function Idm-BuildingsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'Buildings'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            return
+        }
+
+        # Refresh cache if needed
+        if ($Global:Schools.Count -eq 0) {
+            Idm-SchoolsRead -SystemParams $SystemParams -FunctionParams $FunctionParams | Out-Null
+        }
+
+        # Precompute property template
+        $properties = $Global:Properties.$Class | Where-Object { ('hidden' -notin $_.options ) }
+        $propertiesHT = @{}; $Global:Properties.$Class | ForEach-Object { $propertiesHT[$_.name] = $_ }
+
+        $template = [ordered]@{}
+        foreach ($prop in $properties.Name) {
+            $template[$prop] = $null
+        }
+
+        # Prepare runspace pool
+        $cancellationSource = [System.Threading.CancellationTokenSource]::new()
+        $cancellationToken = $cancellationSource.Token
+        $system_params.CancellationSource = $cancellationSource
+
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
+        $runspacePool.Open()
+        $runspaces = @()
+
+        # Index for tracking
+        $index = 0
+        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
+        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        foreach($item in $Global:Schools){
+            if ($Global:CancellationSource.IsCancellationRequested) {
+                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
+                break
+            }
+
+            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
+                param($item, $system_params, $Class, $index)
+                
+                $itemResult = @{
+                    rows = [System.Collections.ArrayList]@()
+                    logMessage = $null
+                }
+
+                $uri = ("v1/schools/{0}/buildings" -f $item.id)
+            
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'building'
+                    LogMessage = "[$($item.ID)]"
+                    LoggingEnabled = $false
+                }
+
+                try {
+                    $response = Execute-SchoologyRequest @splat
+                } catch {
+                    $itemResult.logMessage = "Retrieve Buildings [$($item.ID)] - $_"
+                    return $itemResult
+                }
+
+                [void]$itemResult.rows.AddRange(@() + $response)
+                return $itemResult
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+    
+            $runspace.RunspacePool = $runspacePool
+            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $index++
+        }
+
+        # Collect results
+        $total = $runspaces.Count
+        $completed = 0
+
+        $result = [System.Collections.ArrayList]@()
+        foreach ($r in $runspaces) {
+            $output = $r.Pipe.EndInvoke($r.Status)
+            $completed++
+
+            if ($completed % 50 -eq 0 -or $completed -eq $total) {
+                $percent = [math]::Round(($completed / $total) * 100, 2)
+                Log info "Progress: [$completed/$total] requests completed ($percent%)"
+            }
+
+            if($null -ne $output.logMessage) {
+                Log verbose $output.logMessage
+            }
+
+            foreach($rowItem in $output.rows) {
+                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.Name.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                [void]$result.Add($row)
+            }
+            
+            $r.Pipe.Dispose()
+        }
+
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+
+        # Final output
+        $result
+}
+
+
 
 function Idm-UsersRead {
     param (
@@ -1041,6 +1191,12 @@ function Idm-GroupEventsRead {
         $result
 }
 
+
+# Read Functions End
+
+
+#Create Functions Begin
+
 function Idm-UsersCreate {
     param (
         # Operations
@@ -1266,6 +1422,70 @@ function Idm-SchoolsCreate {
 }
 
 
+function Idm-SectionsCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Sections'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/courses/{course_id}/sections"
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+
+
+
+#Create Functions End
+
+
+
+
 #
 #   Internal Functions
 #
@@ -1367,7 +1587,8 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                     }
 
                     $response = Invoke-RestMethod @splat -ErrorAction Stop
-                    
+                    Write-Host $response.school.id
+                    Write-Host $ResponseProperty
                     $responseData.AddRange(@() + $response.$ResponseProperty)
 
                     if($null -eq $response.links.next -or $response.links.next.length -lt 1){
