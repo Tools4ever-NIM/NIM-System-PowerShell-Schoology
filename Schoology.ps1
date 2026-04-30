@@ -17,6 +17,7 @@ $Global:Groups = [System.Collections.ArrayList]@()
 $Global:Schools = [System.Collections.ArrayList]@()
 $Global:Sections = [System.Collections.ArrayList]@()
 
+
 $Properties = @{
     Schools = @(
         @{ name = 'id';           				    options = @('default','key')} 
@@ -95,9 +96,9 @@ $Properties = @{
         @{ name = 'course_id';           				    options = @('default','create_m')}
         @{ name = 'school_id';           				    options = @('default')}
         @{ name = 'access_code';           				    options = @('default')}
-        @{ name = 'section_title';           				    options = @('default')}
+        @{ name = 'section_title';           				    options = @('default','create_m')}
         @{ name = 'section_code';           				    options = @('default')}
-        @{ name = 'section_school_code';           				    options = @('default')}
+        @{ name = 'section_school_code';           				    options = @('default','create_o')}
         @{ name = 'active';           				    options = @('default')}
         @{ name = 'description';           				    options = @('default')}
         @{ name = 'location';           				    options = @('default')}
@@ -123,7 +124,9 @@ $Properties = @{
     )
     GroupEnrollments = @(
         @{ name ="id";                                   options = @('default','key')}
-        @{ name = 'uid';           				    options = @('default')}
+        @{ name = 'uid';           				    options = @('default','create_m','update_m')}
+        @{ name = 'group_id';           				    options = @('default')}
+        @{ name = 'admin';           				    options = @('default','create_m')}
         @{ name = 'school_uid';           				    options = @('default')}
         @{ name = 'name_title';           				    options = @('default')}
         @{ name = 'name_title_show';           				    options = @('default')}
@@ -136,7 +139,8 @@ $Properties = @{
     )
     SectionEnrollments = @(
         @{ name ="id";                                   options = @('default','key')}
-        @{ name = 'uid';           				    options = @('default')}
+        @{ name = 'uid';           				    options = @('default','create_m','update_m')}
+        @{ name = 'admin';           				    options = @('default','create_m')}
         @{ name = 'school_uid';           				    options = @('default')}
         @{ name = 'name_title';           				    options = @('default')}
         @{ name = 'name_title_show';           				    options = @('default')}
@@ -892,6 +896,9 @@ function Idm-GroupEnrollmentsRead {
                 }
 
                 [void]$itemResult.rows.AddRange(@() + $response)
+                $groupid = @{}
+                $groupid['group_id'] = $item.id
+                 [void]$itemResult.rows.AddRange(@() + $groupid)
                 return $itemResult
             }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
     
@@ -1422,7 +1429,7 @@ function Idm-SchoolsCreate {
 }
 
 
-function Idm-SectionsCreate {
+function Idm-GroupEnrollmentsCreate {
     param (
         # Operations
         [switch] $GetMeta,
@@ -1432,7 +1439,7 @@ function Idm-SectionsCreate {
     )
 
     Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-    $Class = 'Sections'
+    $Class = 'GroupEnrollments'
 
     if ($GetMeta) {
         #
@@ -1462,7 +1469,7 @@ function Idm-SectionsCreate {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = "v1/courses/{course_id}/sections"
+        $uri = "v1/groups/{0}/enrollments" -f $function_params.id
 
         $splat = @{
             SystemParams = $system_params
