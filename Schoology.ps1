@@ -895,10 +895,9 @@ function Idm-GroupEnrollmentsRead {
                     return $itemResult
                 }
 
-                [void]$itemResult.rows.AddRange(@() + $response)
-                $groupid = @{}
-                $groupid['group_id'] = $item.id
-                 [void]$itemResult.rows.AddRange(@() + $groupid)
+
+                $enriched = $response | ForEach-Object { $_ | Add-Member -NotePropertyName 'group_id' -NotePropertyValue $item.id -PassThru }
+                [void]$itemResult.rows.AddRange(@() + $enriched)
                 return $itemResult
             }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
     
