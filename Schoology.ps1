@@ -68,8 +68,8 @@ $Properties = @{
     )
     Courses =@(
         @{name ="id";                                   options = @('default','key')}
-        @{name ="title";                                options = @('default','create_m','update_o')}
-        @{name ="course_code";                          options = @('default','create_m','update_o')}
+        @{name ="title";                                options = @('default','create_m','update_m')}
+        @{name ="course_code";                          options = @('default','create_m','update_m')}
         @{name ="department";                           options = @('default','create_o','update_o')}
         @{name ="description";                          options = @('default','create_o','update_o')}
         @{name ="credits";                              options = @('default')}
@@ -108,7 +108,7 @@ $Properties = @{
         @{ name = 'options';           				    options = @('default')}
         @{ name = 'group_code';           				    options = @('default')}
         @{ name = 'privacy_level';           				    options = @('default','create_o','update_o')}
-        @{ name = 'picture_url';           				    options = @('default')}
+        @{ name = 'picture_url';           				    options = @('default','update_o')}
         @{ name = 'school_id';           				    options = @('default')}
         @{ name = 'building_id';           				    options = @('default')}
     )
@@ -1364,7 +1364,7 @@ function Idm-UsersUpdate {
         @{
             semantics = 'update'
             parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
@@ -1401,6 +1401,118 @@ function Idm-UsersUpdate {
     Log info "Done"
 }
 
+
+function Idm-GroupsUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Groups'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/groups/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-CoursesUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Courses'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/courses/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
 
 
 
