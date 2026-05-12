@@ -1485,7 +1485,7 @@ function Idm-CoursesUpdate {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
