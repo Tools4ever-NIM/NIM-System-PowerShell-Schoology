@@ -70,7 +70,7 @@ $Properties = @{
         @{name ="role_type";                           options = @('default')}
     )
     Courses =@(
-        @{name ="id";                                   options = @('default','key','update_m')}
+        @{name ="id";                                   options = @('default','key')}
         @{name ="title";                                options = @('default','create_m','update_m')}
         @{name ="course_code";                          options = @('default','create_m','update_m')}
         @{name ="department";                           options = @('default','create_o','update_o')}
@@ -83,7 +83,7 @@ $Properties = @{
 
     )
     Sections = @(
-        @{name ="id";                                   options = @('default','key','delete_m')}
+        @{name ="id";                                   options = @('default','key')}
         @{ name = 'course_title';           				    options = @('default')}
         @{ name = 'course_code';           				    options = @('default')}
         @{ name = 'course_id';           				    options = @('default','create_m')}
@@ -1484,7 +1484,7 @@ function Idm-UsersUpdate {
             parameters = @(
                 ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
-                }idm-Sections
+                }
 
                 ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
