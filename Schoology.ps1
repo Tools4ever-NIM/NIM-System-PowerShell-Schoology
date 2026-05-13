@@ -33,7 +33,7 @@ $Properties = @{
     )
     Users = @(
         @{ name = 'uid';           				    options = @('default','key')}    
-        @{ name = 'id';           				    options = @('default','update_m')}    
+        @{ name = 'id';           				    options = @('default','update_m','delete_m')}    
         @{ name = 'school_id';           			options = @('default')}
         @{ name = 'synced';           		        options = @('default')}
         @{ name = 'school_uid';           			options = @('default','create_m','update_m')}
@@ -58,7 +58,10 @@ $Properties = @{
         @{ name = 'child_uids';           			options = @('default','create_o','update_o')}
         @{ name = 'language';           			options = @('default','create_o','update_o')}
         @{ name = 'additional_buildings';           options = @('default','create_o','update_o')}
-        @{ name = 'parent_access_code';           	options = @('default')}
+        @{ name = 'parent_access_code';           	options = @('default','delete_o')}
+        @{ name = 'option_comment';           	options = @('default','delete_o')}
+        @{ name = 'option_keep_enrollments';           	options = @('default','delete_o')}
+        @{ name = 'email_notification';           	options = @('default','delete_o')}
     )
      Roles =@(
         @{name ="id";                                   options = @('default','key')}
@@ -67,7 +70,7 @@ $Properties = @{
         @{name ="role_type";                           options = @('default')}
     )
     Courses =@(
-        @{name ="id";                                   options = @('default','key')}
+        @{name ="id";                                   options = @('default','key','update_m')}
         @{name ="title";                                options = @('default','create_m','update_m')}
         @{name ="course_code";                          options = @('default','create_m','update_m')}
         @{name ="department";                           options = @('default','create_o','update_o')}
@@ -80,15 +83,15 @@ $Properties = @{
 
     )
     Sections = @(
-        @{name ="id";                                   options = @('default','key')}
+        @{name ="id";                                   options = @('default','key','delete_m')}
         @{ name = 'course_title';           				    options = @('default')}
         @{ name = 'course_code';           				    options = @('default')}
         @{ name = 'course_id';           				    options = @('default','create_m')}
         @{ name = 'school_id';           				    options = @('default')}
         @{ name = 'access_code';           				    options = @('default')}
-        @{ name = 'section_title';           				    options = @('default','create_m')}
+        @{ name = 'section_title';           				    options = @('default','create_m','update_o')}
         @{ name = 'section_code';           				    options = @('default')}
-        @{ name = 'section_school_code';           				    options = @('default','create_o')}
+        @{ name = 'section_school_code';           				    options = @('default','create_o','update_o')}
         @{ name = 'active';           				    options = @('default')}
         @{ name = 'description';           				    options = @('default')}
         @{ name = 'location';           				    options = @('default')}
@@ -115,7 +118,7 @@ $Properties = @{
     GroupEnrollments = @(
         @{ name ="id";                                   options = @('default','key')}
         @{ name = 'uid';           				    options = @('default','create_m','update_m')}
-        @{ name = 'group_id';           				    options = @('default')}
+        @{ name = 'group_id';           				    options = @('default','update_m','delete_m')}
         @{ name = 'admin';           				    options = @('default','create_m')}
         @{ name = 'school_uid';           				    options = @('default')}
         @{ name = 'name_title';           				    options = @('default')}
@@ -125,12 +128,12 @@ $Properties = @{
         @{ name = 'name_middle';           				    options = @('default')}
         @{ name = 'name_last';           				    options = @('default')}
         @{ name = 'name_display';           				    options = @('default')}
-        @{ name = 'status';           				    options = @('default','create_m')}
+        @{ name = 'status';           				    options = @('default','create_m','update_m')}
     )
     SectionEnrollments = @(
         @{ name ="id";                                   options = @('default','key')}
         @{ name = 'uid';           				    options = @('default','create_m','update_m')}
-        @{ name = 'section_id';           				    options = @('default')}
+        @{ name = 'section_id';           				    options = @('default','update_m','delete_m')}
         @{ name = 'admin';           				    options = @('default','create_m')}
         @{ name = 'school_uid';           				    options = @('default')}
         @{ name = 'name_title';           				    options = @('default')}
@@ -140,7 +143,7 @@ $Properties = @{
         @{ name = 'name_middle';           				    options = @('default')}
         @{ name = 'name_last';           				    options = @('default')}
         @{ name = 'name_display';           				    options = @('default')}
-        @{ name = 'status';           				    options = @('default')}
+        @{ name = 'status';           				    options = @('default','update_m')}
     )
     SectionEvents = @(
         @{ name ="id";                                   options = @('default','key')}
@@ -1282,6 +1285,62 @@ function Idm-CoursesCreate {
     Log info "Done"
 }
 
+function Idm-SectionsCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Sections'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/courses/{0}/sections" -f $function_params.course_id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
 
 function Idm-GroupEnrollmentsCreate {
     param (
@@ -1323,7 +1382,63 @@ function Idm-GroupEnrollmentsCreate {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = "v1/groups/{0}/enrollments" -f $function_params.id
+        $uri = "v1/groups/{0}/enrollments" -f $function_params.group_id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SectionEnrollmentsCreate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SectionEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'create'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/sections/{0}/enrollments" -f $function_params.section_id
 
         $splat = @{
             SystemParams = $system_params
@@ -1340,11 +1455,14 @@ function Idm-GroupEnrollmentsCreate {
 }
 
 
-
-
+#Create Functions End
+#Create Functions End
 #Create Functions End
 
 #Update Functions Begin
+#Update Functions Begin
+#Update Functions Begin
+
 function Idm-UsersUpdate {
     param (
         # Operations
@@ -1366,7 +1484,7 @@ function Idm-UsersUpdate {
             parameters = @(
                 ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
-                }
+                }idm-Sections
 
                 ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
@@ -1429,7 +1547,7 @@ function Idm-GroupsUpdate {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                 $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
@@ -1503,6 +1621,524 @@ function Idm-CoursesUpdate {
         $splat = @{
             SystemParams = $system_params
             Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SectionsUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Sections'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/sections/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+
+function Idm-GroupEnrollmentsUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'GroupEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key')  } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/groups/{0}/enrollments/{1}" -f $function_params.group_id, $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SectionEnrollmentsUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SectionEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'update'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key')  } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/sections/{0}/enrollments/{0}" -f $function_params.section_id, $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "PUT"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+
+
+#Update Functions End
+#Update Functions End
+#Update Functions End
+
+
+#Delete Functions Begin
+#Delete Functions Begin
+#Delete Functions Begin
+
+function Idm-UsersDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Users'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/users/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-GroupsDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Groups'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                 $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/groups/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+
+function Idm-CoursesDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Courses'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = "v1/courses/{0}" -f $function_params.id
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SectionsDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'Sections'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/sections/{0}" -f $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+
+function Idm-GroupEnrollmentsDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'GroupEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/groups/{0}/enrollments/{1}" -f $function_params.group_id, $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-SchoologyRequest @splat
+
+    }
+
+    Log info "Done"
+}
+
+function Idm-SectionEnrollmentsDelete {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'SectionEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'delete'
+            parameters = @(
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'mandatory' }
+                }
+
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                    @{ name = $_.name;  allowance = 'optional' }
+                }
+
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                    @{ name = $_.name; allowance = 'prohibited' }
+                }
+            )
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/sections/{0}/enrollments/{1}" -f $function_params.section_id, $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
             Uri = $uri                    
             Body = ($function_params | ConvertTo-Json)
         }
