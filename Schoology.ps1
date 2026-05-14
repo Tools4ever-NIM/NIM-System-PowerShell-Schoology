@@ -2186,9 +2186,9 @@ function Execute-SchoologyRequest {
         [string] $LogMessage,
         [boolean] $LoggingEnabled = $true
     )
-    
-    
-    log info $SystemParams
+
+    log info ($SystemParams | ConvertTo-Json)
+
     $splat = @{
         Headers = @{
             "Authorization" = Get-SchoologyAuthorization $SystemParams
