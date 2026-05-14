@@ -18,17 +18,17 @@ $Global:Sections = [System.Collections.ArrayList]@()
 
 $Properties = @{
     Schools = @(
-        @{ name = 'title';           				    options = @('default')}    
-        @{ name = 'address1';           			options = @('default')}
-        @{ name = 'address2';           		        options = @('default')}
-        @{ name = 'city';           			options = @('default')}
-        @{ name = 'state';           			options = @('default')}
-        @{ name = 'postal_code';           		options = @('default')}
-        @{ name = 'country';           			options = @('default')}
-        @{ name = 'website';           options = @('default')}
-        @{ name = 'phone';       options = @('default')}
-        @{ name = 'fax';           			options = @('default')}
-        @{ name = 'building_code';           	options = @('default')}
+        @{ name = 'title';           	            options = @('default')}    
+        @{ name = 'address1';           		    options = @('default')}
+        @{ name = 'address2';           		    options = @('default')}
+        @{ name = 'city';           			    options = @('default')}
+        @{ name = 'state';           			    options = @('default')}
+        @{ name = 'postal_code';           		    options = @('default')}
+        @{ name = 'country';           			    options = @('default')}
+        @{ name = 'website';                        options = @('default')}
+        @{ name = 'phone';                          options = @('default')}
+        @{ name = 'fax';           			        options = @('default')}
+        @{ name = 'building_code';           	    options = @('default')}
     )
     Users = @(
         @{ name = 'uid';           				    options = @('default','key')}    
@@ -58,122 +58,122 @@ $Properties = @{
         @{ name = 'language';           			options = @('default','create_o','update_o')}
         @{ name = 'additional_buildings';           options = @('default','create_o','update_o')}
         @{ name = 'parent_access_code';           	options = @('default','delete_o')}
-        @{ name = 'option_comment';           	options = @('default','delete_o')}
-        @{ name = 'option_keep_enrollments';           	options = @('default','delete_o')}
+        @{ name = 'option_comment';           	    options = @('default','delete_o')}
+        @{ name = 'option_keep_enrollments';        options = @('default','delete_o')}
         @{ name = 'email_notification';           	options = @('default','delete_o')}
     )
      Roles =@(
-        @{name ="id";                                   options = @('default','key')}
-        @{name ="title";                                options = @('default')}
+        @{name ="id";                               options = @('default','key')}
+        @{name ="title";                            options = @('default')}
         @{name ="faculty";                          options = @('default')}
-        @{name ="role_type";                           options = @('default')}
+        @{name ="role_type";                        options = @('default')}
     )
     Courses =@(
-        @{name ="id";                                   options = @('default','key')}
-        @{name ="title";                                options = @('default','create_m','update_m')}
-        @{name ="course_code";                          options = @('default','create_m','update_m')}
-        @{name ="department";                           options = @('default','create_o','update_o')}
-        @{name ="description";                          options = @('default','create_o','update_o')}
-        @{name ="credits";                              options = @('default')}
-        @{name ="subject_area";                         options = @('default')}
-        @{name ="building_id";                          options = @('default')}
-        @{name ="grade_level_range_start";              options = @('default')}
-        @{name ="grade_level_range_end";                options = @('default')}
+        @{name ="id";                               options = @('default','key')}
+        @{name ="title";                            options = @('default','create_m','update_m')}
+        @{name ="course_code";                      options = @('default','create_m','update_m')}
+        @{name ="department";                       options = @('default','create_o','update_o')}
+        @{name ="description";                      options = @('default','create_o','update_o')}
+        @{name ="credits";                          options = @('default')}
+        @{name ="subject_area";                     options = @('default')}
+        @{name ="building_id";                      options = @('default')}
+        @{name ="grade_level_range_start";          options = @('default')}
+        @{name ="grade_level_range_end";            options = @('default')}
 
     )
     Sections = @(
-        @{name ="id";                                   options = @('default','key')}
-        @{ name = 'course_title';           				    options = @('default')}
-        @{ name = 'course_code';           				    options = @('default')}
-        @{ name = 'course_id';           				    options = @('default','create_m')}
-        @{ name = 'school_id';           				    options = @('default')}
-        @{ name = 'access_code';           				    options = @('default')}
-        @{ name = 'section_title';           				    options = @('default','create_m','update_o')}
-        @{ name = 'section_code';           				    options = @('default')}
-        @{ name = 'section_school_code';           				    options = @('default','create_o','update_o')}
-        @{ name = 'active';           				    options = @('default')}
-        @{ name = 'description';           				    options = @('default')}
-        @{ name = 'location';           				    options = @('default')}
-        @{ name = 'meeting_days';           				    options = @('default')}
-        @{ name = 'start_time';           				    options = @('default')}
-        @{ name = 'end_time';           				    options = @('default')}
-        @{ name = 'weight';           				    options = @('default')}
-        @{ name = 'admin';           				    options = @('default')}
+        @{name ="id";                               options = @('default','key')}
+        @{ name = 'course_title';           		options = @('default')}
+        @{ name = 'course_code';           			options = @('default')}
+        @{ name = 'course_id';           			options = @('default','create_m')}
+        @{ name = 'school_id';           			options = @('default')}
+        @{ name = 'access_code';           			options = @('default')}
+        @{ name = 'section_title';           		options = @('default','create_m','update_o')}
+        @{ name = 'section_code';           		options = @('default')}
+        @{ name = 'section_school_code';           	options = @('default','create_o','update_o')}
+        @{ name = 'active';           				options = @('default')}
+        @{ name = 'description';           			options = @('default')}
+        @{ name = 'location';           			options = @('default')}
+        @{ name = 'meeting_days';           		options = @('default')}
+        @{ name = 'start_time';           			options = @('default')}
+        @{ name = 'end_time';           			options = @('default')}
+        @{ name = 'weight';           				options = @('default')}
+        @{ name = 'admin';           				options = @('default')}
     )
     Groups = @(
-        @{ name = "id";                                   options = @('default','key')}
-        @{ name = 'title';           				    options = @('default','create_m','update_o')}
-        @{ name = 'description';           				    options = @('default','create_o','update_o')}
-        @{ name = 'website';           				    options = @('default','create_o','update_o')}
-        @{ name = 'access_code';           				    options = @('default')}
-        @{ name = 'category';           				    options = @('default','create_o','update_o')}
-        @{ name = 'options';           				    options = @('default')}
-        @{ name = 'group_code';           				    options = @('default')}
-        @{ name = 'privacy_level';           				    options = @('default','create_o','update_o')}
-        @{ name = 'picture_url';           				    options = @('default','update_o')}
-        @{ name = 'school_id';           				    options = @('default')}
-        @{ name = 'building_id';           				    options = @('default')}
+        @{ name = "id";                             options = @('default','key')}
+        @{ name = 'title';           				options = @('default','create_m','update_o')}
+        @{ name = 'description';           			options = @('default','create_o','update_o')}
+        @{ name = 'website';           				options = @('default','create_o','update_o')}
+        @{ name = 'access_code';           			options = @('default')}
+        @{ name = 'category';           			options = @('default','create_o','update_o')}
+        @{ name = 'options';           				options = @('default')}
+        @{ name = 'group_code';           			options = @('default')}
+        @{ name = 'privacy_level';           		options = @('default','create_o','update_o')}
+        @{ name = 'picture_url';           			options = @('default','update_o')}
+        @{ name = 'school_id';           			options = @('default')}
+        @{ name = 'building_id';           			options = @('default')}
     )
     GroupEnrollments = @(
-        @{ name ="id";                                   options = @('default','key')}
+        @{ name ="id";                              options = @('default','key')}
         @{ name = 'uid';           				    options = @('default','create_m','update_m')}
-        @{ name = 'group_id';           				    options = @('default','update_m','delete_m')}
-        @{ name = 'admin';           				    options = @('default','create_m')}
-        @{ name = 'school_uid';           				    options = @('default')}
-        @{ name = 'name_title';           				    options = @('default')}
-        @{ name = 'name_title_show';           				    options = @('default')}
-        @{ name = 'name_first';           				    options = @('default')}
-        @{ name = 'name_first_preferred';           				    options = @('default')}
-        @{ name = 'name_middle';           				    options = @('default')}
-        @{ name = 'name_last';           				    options = @('default')}
-        @{ name = 'name_display';           				    options = @('default')}
-        @{ name = 'status';           				    options = @('default','create_m','update_m')}
+        @{ name = 'group_id';           			options = @('default','update_m','delete_m')}
+        @{ name = 'admin';           				options = @('default','create_m')}
+        @{ name = 'school_uid';           			options = @('default')}
+        @{ name = 'name_title';           			options = @('default')}
+        @{ name = 'name_title_show';           		options = @('default')}
+        @{ name = 'name_first';           			options = @('default')}
+        @{ name = 'name_first_preferred';           options = @('default')}
+        @{ name = 'name_middle';           			options = @('default')}
+        @{ name = 'name_last';           			options = @('default')}
+        @{ name = 'name_display';           		options = @('default')}
+        @{ name = 'status';           				options = @('default','create_m','update_m')}
     )
     SectionEnrollments = @(
-        @{ name ="id";                                   options = @('default','key')}
+        @{ name ="id";                              options = @('default','key')}
         @{ name = 'uid';           				    options = @('default','create_m','update_m')}
-        @{ name = 'section_id';           				    options = @('default','update_m','delete_m')}
-        @{ name = 'admin';           				    options = @('default','create_m')}
-        @{ name = 'school_uid';           				    options = @('default')}
-        @{ name = 'name_title';           				    options = @('default')}
-        @{ name = 'name_title_show';           				    options = @('default')}
-        @{ name = 'name_first';           				    options = @('default')}
-        @{ name = 'name_first_preferred';           				    options = @('default')}
-        @{ name = 'name_middle';           				    options = @('default')}
-        @{ name = 'name_last';           				    options = @('default')}
-        @{ name = 'name_display';           				    options = @('default')}
-        @{ name = 'status';           				    options = @('default','update_m')}
+        @{ name = 'section_id';           			options = @('default','update_m','delete_m')}
+        @{ name = 'admin';           				options = @('default','create_m')}
+        @{ name = 'school_uid';           			options = @('default')}
+        @{ name = 'name_title';           			options = @('default')}
+        @{ name = 'name_title_show';           		options = @('default')}
+        @{ name = 'name_first';           			options = @('default')}
+        @{ name = 'name_first_preferred';           options = @('default')}
+        @{ name = 'name_middle';           			options = @('default')}
+        @{ name = 'name_last';           			options = @('default')}
+        @{ name = 'name_display';           		options = @('default')}
+        @{ name = 'status';           				options = @('default','update_m')}
     )
     SectionEvents = @(
-        @{ name ="id";                                   options = @('default','key')}
-        @{ name = 'title';           				    options = @('default')}
-        @{ name = 'description';           				    options = @('default')}
-        @{ name = 'start';           				    options = @('default')}
-        @{ name = 'has_end';           				    options = @('default')}
+        @{ name ="id";                              options = @('default','key')}
+        @{ name = 'title';           				options = @('default')}
+        @{ name = 'description';           			options = @('default')}
+        @{ name = 'start';           				options = @('default')}
+        @{ name = 'has_end';           				options = @('default')}
         @{ name = 'end';           				    options = @('default')}
-        @{ name = 'all_day';           				    options = @('default')}
-        @{ name = 'editable';           				    options = @('default')}
-        @{ name = 'rsvp';           				    options = @('default')}
-        @{ name = 'comments_enabled';           				    options = @('default')}
-        @{ name = 'type';           				    options = @('default')}
-        @{ name = 'realm';           				    options = @('default')}
-        @{ name = 'section_id';           				    options = @('default')}
+        @{ name = 'all_day';           				options = @('default')}
+        @{ name = 'editable';           			options = @('default')}
+        @{ name = 'rsvp';           				options = @('default')}
+        @{ name = 'comments_enabled';           	options = @('default')}
+        @{ name = 'type';           				options = @('default')}
+        @{ name = 'realm';           				options = @('default')}
+        @{ name = 'section_id';           			options = @('default')}
 
     )
   GroupEvents = @(
-        @{ name ="id";                                   options = @('default','key')}
-        @{ name = 'title';           				    options = @('default')}
-        @{ name = 'description';           				    options = @('default')}
-        @{ name = 'start';           				    options = @('default')}
-        @{ name = 'has_end';           				    options = @('default')}
+        @{ name ="id";                              options = @('default','key')}
+        @{ name = 'title';           				options = @('default')}
+        @{ name = 'description';           			options = @('default')}
+        @{ name = 'start';           				options = @('default')}
+        @{ name = 'has_end';           				options = @('default')}
         @{ name = 'end';           				    options = @('default')}
-        @{ name = 'all_day';           				    options = @('default')}
-        @{ name = 'editable';           				    options = @('default')}
-        @{ name = 'rsvp';           				    options = @('default')}
-        @{ name = 'comments_enabled';           				    options = @('default')}
-        @{ name = 'type';           				    options = @('default')}
-        @{ name = 'realm';           				    options = @('default')}
-        @{ name = 'group_id';           				    options = @('default')}
+        @{ name = 'all_day';           				options = @('default')}
+        @{ name = 'editable';           			options = @('default')}
+        @{ name = 'rsvp';           				options = @('default')}
+        @{ name = 'comments_enabled';           	options = @('default')}
+        @{ name = 'type';           				options = @('default')}
+        @{ name = 'realm';           				options = @('default')}
+        @{ name = 'group_id';           			options = @('default')}
 
     )
     
@@ -670,7 +670,7 @@ function Idm-SectionsRead {
                     Uri = $uri                    
                     Body = $null
                     ResponseProperty = 'section'
-                    LogMessage =  "[$($item.ID)]"
+                    LogMessage = "[$($item.ID)]"
                     LoggingEnabled = $false
                 }
 
@@ -729,6 +729,8 @@ function Idm-SectionsRead {
         # Final output
         $result
 }
+
+
 function Idm-GroupEnrollmentsRead {
     param (
         # Mode
