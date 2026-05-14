@@ -17,8 +17,7 @@ $Global:Sections = [System.Collections.ArrayList]@()
 
 
 $Properties = @{
-    Schools = @(
-        @{ name = 'id';           				    options = @('default','key')} 
+    Schools = @( xxxx
         @{ name = 'title';           				    options = @('default')}    
         @{ name = 'address1';           			options = @('default')}
         @{ name = 'address2';           		        options = @('default')}
@@ -2187,6 +2186,8 @@ function Execute-SchoologyRequest {
         [string] $LogMessage,
         [boolean] $LoggingEnabled = $true
     )
+    
+    log info $SystemParams
 
     $splat = @{
         Headers = @{
