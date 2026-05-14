@@ -645,9 +645,11 @@ function Idm-SectionsRead {
         $index = 0
         $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
         $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
-
+  
         foreach($item in $Global:Courses){
+           
             if ($Global:CancellationSource.IsCancellationRequested) {
+                
                 Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
                 break
             }
@@ -659,7 +661,7 @@ function Idm-SectionsRead {
                     rows = [System.Collections.ArrayList]@()
                     logMessage = $null
                 }
-
+                                  
                 $uri = ("v1/courses/{0}/sections" -f $item.id)
             
                 $splat = @{
@@ -668,7 +670,7 @@ function Idm-SectionsRead {
                     Uri = $uri                    
                     Body = $null
                     ResponseProperty = 'section'
-                    LogMessage = "[$($item.ID)]"
+                    LogMessage =  "[$($item.ID)]"
                     LoggingEnabled = $false
                 }
 
@@ -683,7 +685,7 @@ function Idm-SectionsRead {
                 [void]$itemResult.rows.AddRange(@() + $response)
                 return $itemResult
             }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
-    
+
             $runspace.RunspacePool = $runspacePool
             $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
             $index++
@@ -2187,7 +2189,7 @@ function Execute-SchoologyRequest {
         [boolean] $LoggingEnabled = $true
     )
 
-    log info ($SystemParams | ConvertTo-Json)
+    log info ($splat.uri)
 
     $splat = @{
         Headers = @{
@@ -2198,7 +2200,7 @@ function Execute-SchoologyRequest {
         Method = $Method
         Uri = "https://api.schoology.com/$($Uri)"
     }
-
+    log info ($splat.uri)
     if($Method -ne "GET") {
         $splat["Body"] = $Body
     } else {
