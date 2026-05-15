@@ -15,6 +15,8 @@ $Global:Courses = [System.Collections.ArrayList]@()
 $Global:Groups = [System.Collections.ArrayList]@()
 $Global:Sections = [System.Collections.ArrayList]@()
 
+$Global:Proxy = @{}
+$Global:ProxyInitialized = $false
 
 $Properties = @{
     Schools = @(
@@ -309,6 +311,13 @@ function Idm-SystemInfo {
 }
 
 function Idm-OnUnload {
+    $Global:AuthToken = $null
+    $Global:Proxy = @{}
+    $Global:ProxyInitialized = $false
+    $Global:Users.Clear()
+    $Global:Courses.Clear()
+    $Global:Groups.Clear()
+    $Global:Sections.Clear()
 }
 
 #
@@ -348,7 +357,7 @@ function Idm-SchoolsRead {
                     Body = $null
                     ResponseProperty = 'school'
                 }
-                ((Execute-SchoologyRequest @splat) )
+                ((Execute-Request @splat) )
 
                 $Global:SchoolsCacheTime = Get-Date
             }
@@ -373,7 +382,6 @@ function Idm-SchoolsRead {
             
         }
 }
-
 
 function Idm-UsersRead {
     param (
@@ -407,7 +415,7 @@ function Idm-UsersRead {
                     ResponseProperty = 'user'
                 }
 
-                $Global:Users.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:Users.AddRange(@() + (Execute-Request @splat) )
                 $Global:UsersCacheTime = Get-Date
             }
             
@@ -449,9 +457,6 @@ function Idm-RolesRead {
             Get-ClassMetaData -SystemParams $SystemParams -Class $Class
             
         } else {
-
-    
-
                 $uri = "v1/roles"
                 
                 $splat = @{
@@ -462,7 +467,7 @@ function Idm-RolesRead {
                     ResponseProperty = 'role'
                 }
 
-            $response = (Execute-SchoologyRequest @splat)          
+            $response = (Execute-Request @splat)          
             $properties = ($Global:Properties.$Class).name
             $hash_table = [ordered]@{}
 
@@ -516,7 +521,7 @@ function Idm-GroupsRead {
                     ResponseProperty = 'group'
                 }
 
-                $Global:Groups.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:Groups.AddRange(@() + (Execute-Request @splat) )
                 $Global:GroupsCacheTime = Get-Date
             }
             
@@ -540,8 +545,6 @@ function Idm-GroupsRead {
             
         }
 }
-
-
 
 function Idm-CoursesRead {
     param (
@@ -575,7 +578,7 @@ function Idm-CoursesRead {
                     ResponseProperty = 'course'
                 }
 
-                $Global:Courses.AddRange(@() + (Execute-SchoologyRequest @splat) )
+                $Global:Courses.AddRange(@() + (Execute-Request @splat) )
                 $Global:CoursesCacheTime = Get-Date
             }
             
@@ -634,29 +637,31 @@ function Idm-SectionsRead {
 
         # Prepare runspace pool
         $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-        $cancellationToken = $cancellationSource.Token
-        $system_params.CancellationSource = $cancellationSource
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
         $runspacePool.Open()
-        $runspaces = @()
+        $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         # Index for tracking
         $index = 0
-        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
-        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
-  
-        foreach($item in $Global:Courses){
-           
-            if ($Global:CancellationSource.IsCancellationRequested) {
-                
-                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
-                break
-            }
 
-            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
-                param($item, $system_params, $Class, $index)
-                
+        $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
+        $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
+        
+        # Capture once — stable for the entire sync
+        $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+        $authTokenSnapshot       = $Global:AuthToken
+        $proxyInitializedSnapshot = $Global:ProxyInitialized
+
+        foreach($item in $Global:Courses){
+            $runspace = [powershell]::Create()
+            [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript({
+                param($item, $system_params, $Class, $index, $proxy, $authToken, $proxyInitialized)
+            
+                $Global:Proxy            = $proxy
+                $Global:AuthToken        = $authToken
+                $Global:ProxyInitialized = $proxyInitialized
+
                 $itemResult = @{
                     rows = [System.Collections.ArrayList]@()
                     logMessage = $null
@@ -675,7 +680,7 @@ function Idm-SectionsRead {
                 }
 
                 try {
-                    $response = Execute-SchoologyRequest @splat
+                    $response = Execute-Request @splat
                 } catch {
                     $itemResult.logMessage = "Retrieve Course Sections [$($item.ID)] - $_"
                     return $itemResult
@@ -684,10 +689,11 @@ function Idm-SectionsRead {
 
                 [void]$itemResult.rows.AddRange(@() + $response)
                 return $itemResult
-            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
 
             $runspace.RunspacePool = $runspacePool
-            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
+
             $index++
         }
 
@@ -695,41 +701,45 @@ function Idm-SectionsRead {
         $total = $runspaces.Count
         $completed = 0
 
-        $result = [System.Collections.ArrayList]@()
-        foreach ($r in $runspaces) {
-            $output = $r.Pipe.EndInvoke($r.Status)
-            $completed++
+        while ($runspaces.Count -gt 0) {
+            for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                $r = $runspaces[$i]
+                if (-not $r.Status.IsCompleted) { continue }
 
-            if ($completed % 50 -eq 0 -or $completed -eq $total) {
-                $percent = [math]::Round(($completed / $total) * 100, 2)
-                Log info "Progress: [$completed/$total] requests completed ($percent%)"
-            }
+                $output = $r.Pipe.EndInvoke($r.Status)
+                $completed++
 
-            if($null -ne $output.logMessage) {
-                Log verbose $output.logMessage
-            }
-
-            foreach($rowItem in $output.rows) {
-                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
-                foreach($prop in $rowItem.PSObject.properties) {
-                    if(!$properties.Name.contains($prop.Name)) { continue }
-                    $row.($prop.Name) = $prop.Value
+                if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                    $percent = [math]::Round(($completed / $total) * 100, 2)
+                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
                 }
 
-                [void]$result.Add($row)
-                [void]$Global:Sections.Add($row)
-            }
-            
-            $r.Pipe.Dispose()
+                if($null -ne $output.logMessage) {
+                    Log verbose $output.logMessage
+                }
+
+                foreach($rowItem in $output.rows) {
+                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.Name.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    [void]$Global:Sections.Add($row)
+                }
+
+                $r.Pipe.Dispose()
+                $runspaces.RemoveAt($i)
+            } 
+            if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
         }
 
         $runspacePool.Close()
         $runspacePool.Dispose()
+        $cancellationSource.Dispose()
 
-        # Final output
-        $result
+        $Global:Sections
 }
-
 
 function Idm-GroupEnrollmentsRead {
     param (
@@ -765,26 +775,30 @@ function Idm-GroupEnrollmentsRead {
 
         # Prepare runspace pool
         $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-        $cancellationToken = $cancellationSource.Token
-        $system_params.CancellationSource = $cancellationSource
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
         $runspacePool.Open()
-        $runspaces = @()
+        $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         # Index for tracking
         $index = 0
-        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
-        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
+        $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
+        
+        # Capture once — stable for the entire sync
+        $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+        $authTokenSnapshot       = $Global:AuthToken
+        $proxyInitializedSnapshot = $Global:ProxyInitialized
 
         foreach($item in $Global:Groups){
-            if ($Global:CancellationSource.IsCancellationRequested) {
-                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
-                break
-            }
-
-            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
-                param($item, $system_params, $Class, $index)
+            $runspace = [powershell]::Create()
+            [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript({
+                param($item, $system_params, $Class, $index, $proxy, $authToken, $proxyInitialized)
+            
+                $Global:Proxy            = $proxy
+                $Global:AuthToken        = $authToken
+                $Global:ProxyInitialized = $proxyInitialized
                 
                 $itemResult = @{
                     rows = [System.Collections.ArrayList]@()
@@ -804,7 +818,7 @@ function Idm-GroupEnrollmentsRead {
                 }
 
                 try {
-                    $response = Execute-SchoologyRequest @splat
+                    $response = Execute-Request @splat
                 } catch {
                     $itemResult.logMessage = "Retrieve Group Memberships [$($item.ID)] - $_"
                     return $itemResult
@@ -814,10 +828,11 @@ function Idm-GroupEnrollmentsRead {
                 $enriched = $response | ForEach-Object { $_ | Add-Member -NotePropertyName 'group_id' -NotePropertyValue $item.id -PassThru }
                 [void]$itemResult.rows.AddRange(@() + $enriched)
                 return $itemResult
-            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
     
             $runspace.RunspacePool = $runspacePool
-            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
+
             $index++
         }
 
@@ -825,38 +840,42 @@ function Idm-GroupEnrollmentsRead {
         $total = $runspaces.Count
         $completed = 0
 
-        $result = [System.Collections.ArrayList]@()
-        foreach ($r in $runspaces) {
-            $output = $r.Pipe.EndInvoke($r.Status)
-            $completed++
+        while ($runspaces.Count -gt 0) {
+            for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                $r = $runspaces[$i]
+                if (-not $r.Status.IsCompleted) { continue }
 
-            if ($completed % 50 -eq 0 -or $completed -eq $total) {
-                $percent = [math]::Round(($completed / $total) * 100, 2)
-                Log info "Progress: [$completed/$total] requests completed ($percent%)"
-            }
+                $output = $r.Pipe.EndInvoke($r.Status)
+                $completed++
 
-            if($null -ne $output.logMessage) {
-                Log verbose $output.logMessage
-            }
-
-            foreach($rowItem in $output.rows) {
-                $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
-                foreach($prop in $rowItem.PSObject.properties) {
-                    if(!$properties.Name.contains($prop.Name)) { continue }
-                    $row.($prop.Name) = $prop.Value
+                if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                    $percent = [math]::Round(($completed / $total) * 100, 2)
+                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
                 }
 
-                [void]$result.Add($row)
-            }
+                if($null -ne $output.logMessage) {
+                    Log verbose $output.logMessage
+                }
+
+                foreach($rowItem in $output.rows) {
+                    $row = New-Object -TypeName PSObject -Property ([ordered]@{} + $template)
+                    foreach($prop in $rowItem.PSObject.properties) {
+                        if(!$properties.Name.contains($prop.Name)) { continue }
+                        $row.($prop.Name) = $prop.Value
+                    }
+
+                    $row
+                }
             
             $r.Pipe.Dispose()
+                $runspaces.RemoveAt($i)
+            } 
+            if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
         }
 
         $runspacePool.Close()
         $runspacePool.Dispose()
-
-        # Final output
-        $result
+        $cancellationSource.Dispose()
 }
 
 function Idm-SectionEnrollmentsRead {
@@ -868,7 +887,7 @@ function Idm-SectionEnrollmentsRead {
         [string] $FunctionParams
 
     )
-      $system_params   = ConvertFrom-Json2 $SystemParams
+        $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
         $Class = 'SectionEnrollments'
         
@@ -893,26 +912,30 @@ function Idm-SectionEnrollmentsRead {
 
         # Prepare runspace pool
         $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-        $cancellationToken = $cancellationSource.Token
-        $system_params.CancellationSource = $cancellationSource
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
         $runspacePool.Open()
-        $runspaces = @()
+        $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         # Index for tracking
         $index = 0
-        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
-        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
+        $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
+        
+        # Capture once — stable for the entire sync
+        $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+        $authTokenSnapshot       = $Global:AuthToken
+        $proxyInitializedSnapshot = $Global:ProxyInitialized
 
         foreach($item in $Global:Sections){
-            if ($Global:CancellationSource.IsCancellationRequested) {
-                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
-                break
-            }
-
-            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
-                param($item, $system_params, $Class, $index)
+            $runspace = [powershell]::Create()
+            [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript({
+                param($item, $system_params, $Class, $index, $proxy, $authToken, $proxyInitialized)
+            
+                $Global:Proxy            = $proxy
+                $Global:AuthToken        = $authToken
+                $Global:ProxyInitialized = $proxyInitialized
                 
                 $itemResult = @{
                     rows = [System.Collections.ArrayList]@()
@@ -920,7 +943,7 @@ function Idm-SectionEnrollmentsRead {
                 }
 
                 $uri = ("v1/Section/{0}/enrollments" -f $item.id)
-                Write-Host $uri
+                
                 $splat = @{
                     SystemParams = $system_params
                     Method = "GET"
@@ -932,7 +955,7 @@ function Idm-SectionEnrollmentsRead {
                 }
 
                 try {
-                    $response = Execute-SchoologyRequest @splat
+                    $response = Execute-Request @splat
                 } catch {
                     $itemResult.logMessage = "Retrieve Group Memberships [$($item.ID)] - $_"
                     return $itemResult
@@ -942,10 +965,11 @@ function Idm-SectionEnrollmentsRead {
                 $enriched = $response | ForEach-Object { $_ | Add-Member -NotePropertyName 'section_id' -NotePropertyValue $item.id -PassThru }
                 [void]$itemResult.rows.AddRange(@() + $enriched)
                 return $itemResult
-            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
-    
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
+
             $runspace.RunspacePool = $runspacePool
-            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
+
             $index++
         }
 
@@ -953,15 +977,18 @@ function Idm-SectionEnrollmentsRead {
         $total = $runspaces.Count
         $completed = 0
 
-        $result = [System.Collections.ArrayList]@()
-        foreach ($r in $runspaces) {
-            $output = $r.Pipe.EndInvoke($r.Status)
-            $completed++
+        while ($runspaces.Count -gt 0) {
+            for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                $r = $runspaces[$i]
+                if (-not $r.Status.IsCompleted) { continue }
 
-            if ($completed % 50 -eq 0 -or $completed -eq $total) {
-                $percent = [math]::Round(($completed / $total) * 100, 2)
-                Log info "Progress: [$completed/$total] requests completed ($percent%)"
-            }
+                $output = $r.Pipe.EndInvoke($r.Status)
+                $completed++
+
+                if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                    $percent = [math]::Round(($completed / $total) * 100, 2)
+                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
+                }
 
             if($null -ne $output.logMessage) {
                 Log verbose $output.logMessage
@@ -974,17 +1001,18 @@ function Idm-SectionEnrollmentsRead {
                     $row.($prop.Name) = $prop.Value
                 }
 
-                [void]$result.Add($row)
+                $row
             }
             
             $r.Pipe.Dispose()
+                $runspaces.RemoveAt($i)
+            } 
+            if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
         }
 
         $runspacePool.Close()
         $runspacePool.Dispose()
-
-        # Final output
-        $result
+        $cancellationSource.Dispose()
 }
 
 function Idm-GroupEventsRead {
@@ -1021,26 +1049,30 @@ function Idm-GroupEventsRead {
 
         # Prepare runspace pool
         $cancellationSource = [System.Threading.CancellationTokenSource]::new()
-        $cancellationToken = $cancellationSource.Token
-        $system_params.CancellationSource = $cancellationSource
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, [int]$system_params.nr_of_threads)
         $runspacePool.Open()
-        $runspaces = @()
+        $runspaces = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         # Index for tracking
         $index = 0
-        $funcDef = "function Execute-SchoologyRequest { $((Get-Command Execute-SchoologyRequest -CommandType Function).ScriptBlock.ToString()) }"
-        $funcAuthDef = "function Get-SchoologyAuthorization { $((Get-Command Get-SchoologyAuthorization -CommandType Function).ScriptBlock.ToString()) }"
+
+        $funcDef = "function Execute-Request { $((Get-Command Execute-Request -CommandType Function).ScriptBlock.ToString()) }"
+        $funcDef2 = "function Execute-Authorization { $((Get-Command Execute-Authorization -CommandType Function).ScriptBlock.ToString()) }"
+        
+        # Capture once — stable for the entire sync
+        $proxySnapshot           = if ($Global:Proxy) { $Global:Proxy.Clone() } else { $null }
+        $authTokenSnapshot       = $Global:AuthToken
+        $proxyInitializedSnapshot = $Global:ProxyInitialized
 
         foreach($item in $Global:Groups){
-            if ($Global:CancellationSource.IsCancellationRequested) {
-                Log warning "Execution canceled due to 503 error. Skipping remaining runspaces."
-                break
-            }
-
-            $runspace = [powershell]::Create().AddScript($funcDef).AddScript($funcAuthDef).AddScript({
-                param($item, $system_params, $Class, $index)
+            $runspace = [powershell]::Create()
+            [void]$runspace.AddScript($funcDef).AddScript($funcDef2).AddScript({
+                param($item, $system_params, $Class, $index, $proxy, $authToken, $proxyInitialized)
+            
+                $Global:Proxy            = $proxy
+                $Global:AuthToken        = $authToken
+                $Global:ProxyInitialized = $proxyInitialized
                 
                 $itemResult = @{
                     rows = [System.Collections.ArrayList]@()
@@ -1060,7 +1092,7 @@ function Idm-GroupEventsRead {
                 }
 
                 try {
-                    $response = Execute-SchoologyRequest @splat
+                    $response = Execute-Request @splat
                     
                 } catch {
                     $itemResult.logMessage = "Retrieve Section Events [$($item.ID)] - $_"
@@ -1069,26 +1101,30 @@ function Idm-GroupEventsRead {
 
                 [void]$itemResult.rows.AddRange(@() + $response)
                 return $itemResult
-            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index)
-    
+            }).AddArgument($item).AddArgument($system_params).AddArgument($Class).AddArgument($index).AddArgument($proxySnapshot).AddArgument($authTokenSnapshot).AddArgument($proxyInitializedSnapshot)
+
             $runspace.RunspacePool = $runspacePool
-            $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index }
+            $runspaces.Add([PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke(); Index = $index })
+
             $index++
         }
 
-        # Collect results
+       # Collect results
         $total = $runspaces.Count
         $completed = 0
 
-        $result = [System.Collections.ArrayList]@()
-        foreach ($r in $runspaces) {
-            $output = $r.Pipe.EndInvoke($r.Status)
-            $completed++
+        while ($runspaces.Count -gt 0) {
+            for ($i = $runspaces.Count - 1; $i -ge 0; $i--) {
+                $r = $runspaces[$i]
+                if (-not $r.Status.IsCompleted) { continue }
 
-            if ($completed % 50 -eq 0 -or $completed -eq $total) {
-                $percent = [math]::Round(($completed / $total) * 100, 2)
-                Log info "Progress: [$completed/$total] requests completed ($percent%)"
-            }
+                $output = $r.Pipe.EndInvoke($r.Status)
+                $completed++
+
+                if ($completed % 250 -eq 0 -or $completed -eq $total) {
+                    $percent = [math]::Round(($completed / $total) * 100, 2)
+                    Log info "Progress: [$completed/$total] requests completed ($percent%)"
+                }
 
             if($null -ne $output.logMessage) {
                 Log verbose $output.logMessage
@@ -1101,25 +1137,23 @@ function Idm-GroupEventsRead {
                     $row.($prop.Name) = $prop.Value
                 }
 
-                [void]$result.Add($row)
+                $row
             }
             
             $r.Pipe.Dispose()
+                $runspaces.RemoveAt($i)
+            } 
+            if ($runspaces.Count -gt 0) { Start-Sleep -Milliseconds 2500 }
         }
 
         $runspacePool.Close()
         $runspacePool.Dispose()
-
-        # Final output
-        $result
+        $cancellationSource.Dispose()
 }
-
-
 # Read Functions End
 
 
 #Create Functions Begin
-
 function Idm-UsersCreate {
     param (
         # Operations
@@ -1169,7 +1203,7 @@ function Idm-UsersCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1225,7 +1259,7 @@ function Idm-GroupsCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1281,7 +1315,7 @@ function Idm-CoursesCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1337,13 +1371,12 @@ function Idm-SectionsCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
 
 function Idm-GroupEnrollmentsCreate {
     param (
@@ -1394,7 +1427,7 @@ function Idm-GroupEnrollmentsCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1450,22 +1483,15 @@ function Idm-SectionEnrollmentsCreate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
-
-#Create Functions End
-#Create Functions End
 #Create Functions End
 
 #Update Functions Begin
-#Update Functions Begin
-#Update Functions Begin
-
 function Idm-UsersUpdate {
     param (
         # Operations
@@ -1515,13 +1541,12 @@ function Idm-UsersUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
 
 function Idm-GroupsUpdate {
     param (
@@ -1572,7 +1597,7 @@ function Idm-GroupsUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1628,7 +1653,7 @@ function Idm-CoursesUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1684,13 +1709,12 @@ function Idm-SectionsUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
 
 function Idm-GroupEnrollmentsUpdate {
     param (
@@ -1741,7 +1765,7 @@ function Idm-GroupEnrollmentsUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1797,24 +1821,15 @@ function Idm-SectionEnrollmentsUpdate {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
-
-
-#Update Functions End
-#Update Functions End
 #Update Functions End
 
-
 #Delete Functions Begin
-#Delete Functions Begin
-#Delete Functions Begin
-
 function Idm-UsersDelete {
     param (
         # Operations
@@ -1864,7 +1879,7 @@ function Idm-UsersDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1920,7 +1935,7 @@ function Idm-GroupsDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -1977,7 +1992,7 @@ function Idm-CoursesDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -2033,7 +2048,7 @@ function Idm-SectionsDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -2090,7 +2105,7 @@ function Idm-GroupEnrollmentsDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
@@ -2146,19 +2161,53 @@ function Idm-SectionEnrollmentsDelete {
             Body = ($function_params | ConvertTo-Json)
         }
 
-        Execute-SchoologyRequest @splat
+        Execute-Request @splat
 
     }
 
     Log info "Done"
 }
-
+#Delete Functions End
 
 
 #
 #   Internal Functions
 #
-function Get-SchoologyAuthorization {
+function Initialize-Proxy {
+    param (
+        [hashtable] $SystemParams
+    )
+
+    if($SystemParams.use_proxy)
+                {
+                    Add-Type @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) {
+        return true;
+    }
+}
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+                    
+        $Global:Proxy['ProxyAddress'] = $SystemParams.proxy_address
+
+        if($SystemParams.use_proxy_credentials)
+        {
+            $Global:Proxy["ProxyCredential"] = New-Object System.Management.Automation.PSCredential ($SystemParams.proxy_username, (ConvertTo-SecureString $SystemParams.proxy_password -AsPlainText -Force) )
+        }
+    } else {
+        $Global:Proxy = $null
+    }
+
+
+}
+
+
+function Execute-Authorization {
     param (
         [hashtable] $SystemParams
     )
@@ -2176,11 +2225,11 @@ function Get-SchoologyAuthorization {
             [int64](Get-Date(Get-Date).ToUniversalTime() -UFormat %s),
             $SystemParams.clientSecret
 
-    return $Authorization   
+    $Global:AuthToken = $Authorization   
 
 }
 
-function Execute-SchoologyRequest {
+function Execute-Request {
     param (
         [hashtable] $SystemParams,
         [string] $Method,
@@ -2190,19 +2239,26 @@ function Execute-SchoologyRequest {
         [string] $LogMessage,
         [boolean] $LoggingEnabled = $true
     )
+    
+    if (-not $Global:ProxyInitialized) {
+        Initialize-Proxy -SystemParams $SystemParams
+        $Global:ProxyInitialized = $true
+    }
 
-    log info ($splat.uri)
+    if ($Global:AuthToken.length -lt 1) {
+        Execute-Authorization $SystemParams
+    }
 
     $splat = @{
         Headers = @{
-            "Authorization" = Get-SchoologyAuthorization $SystemParams
+            "Authorization" = $Global:AuthToken
             "Accept" = "application/json"
             "Content-Type" = "application/json"
         }
         Method = $Method
         Uri = "https://api.schoology.com/$($Uri)"
     }
-    log info ($splat.uri)
+    
     if($Method -ne "GET") {
         $splat["Body"] = $Body
     } else {
@@ -2212,26 +2268,10 @@ function Execute-SchoologyRequest {
         }
     }
 
-     if($SystemParams.use_proxy)
-                {
-                    Add-Type @"
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-public class TrustAllCertsPolicy : ICertificatePolicy {
-    public bool CheckValidationResult(
-        ServicePoint srvPoint, X509Certificate certificate,
-        WebRequest request, int certificateProblem) {
-        return true;
-    }
-}
-"@
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-                    
-        $splat["Proxy"] = $SystemParams.proxy_address
-
-        if($SystemParams.use_proxy_credentials)
-        {
-            $splat["proxyCredential"] = New-Object System.Management.Automation.PSCredential ($SystemParams.proxy_username, (ConvertTo-SecureString $SystemParams.proxy_password -AsPlainText -Force) )
+     if ($SystemParams.use_proxy) {
+        $splat["Proxy"] = $Global:Proxy['ProxyAddress']
+        if ($SystemParams.use_proxy_credentials) {
+            $splat["ProxyCredential"] = $Global:Proxy["ProxyCredential"]
         }
     }
 
@@ -2251,8 +2291,10 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                         if($LoggingEnabled) { Log verbose "$($splat.Method) Call: $($splat.Uri)$attemptSuffix" }
                     }
                     
+                    Execute-Authorization $SystemParams
+
                     $splat.Headers = @{
-                            "Authorization" = Get-SchoologyAuthorization $SystemParams
+                            "Authorization" = $Global:AuthToken
                             "Accept" = "application/json"
                             "Content-Type" = "application/json"
                     }
@@ -2288,9 +2330,9 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
                     }
                     if($LoggingEnabled) { Log warning "Received $statusCode. Retrying in $retryDelay seconds..." }
                     Start-Sleep -Seconds $retryDelay
-                    $retryDelay *= 2  # Exponential backoff
+                    $retryDelay *= 2
                 } else {
-                    throw  # Rethrow for other errors
+                    throw $_
                 }
         }
         break
