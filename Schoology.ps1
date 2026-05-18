@@ -90,12 +90,13 @@ $Properties = @{
         @{ name = 'course_id';           			options = @('default','create_m')}
         @{ name = 'school_id';           			options = @('default')}
         @{ name = 'access_code';           			options = @('default')}
-        @{ name = 'section_title';           		options = @('default','create_m','update_o')}
-        @{ name = 'section_code';           		options = @('default')}
+        @{ name = 'section_title';           		options = @('default','create_o','update_m')}
+        @{ name = 'section_code';           		options = @('default','create_o','update_o')}
         @{ name = 'section_school_code';           	options = @('default','create_o','update_o')}
         @{ name = 'active';           				options = @('default')}
-        @{ name = 'description';           			options = @('default')}
-        @{ name = 'location';           			options = @('default')}
+        @{ name = 'grading_periods';           		options = @('default','create_m','update_m')}
+        @{ name = 'description';           			options = @('default','create_o','update_o')}
+        @{ name = 'location';           			options = @('default','create_o','update_o')}
         @{ name = 'meeting_days';           		options = @('default')}
         @{ name = 'start_time';           			options = @('default')}
         @{ name = 'end_time';           			options = @('default')}
@@ -162,7 +163,7 @@ $Properties = @{
         @{ name = 'section_id';           			options = @('default')}
 
     )
-  GroupEvents = @(
+    GroupEvents = @(
         @{ name ="id";                              options = @('default','key')}
         @{ name = 'title';           				options = @('default')}
         @{ name = 'description';           			options = @('default')}
@@ -177,6 +178,13 @@ $Properties = @{
         @{ name = 'realm';           				options = @('default')}
         @{ name = 'group_id';           			options = @('default')}
 
+    )
+    GradingPeriods = @(
+        @{ name ="id";                              options = @('default','key')}
+        @{ name = 'title';           				options = @('default')}
+        @{ name = 'start';           				options = @('default')}
+        @{ name = 'end';           				    options = @('default')}
+        @{ name = 'active';           				options = @('default')}
     )
     
 }
@@ -465,6 +473,55 @@ function Idm-RolesRead {
                     Uri = $uri                    
                     Body = $null
                     ResponseProperty = 'role'
+                }
+
+            $response = (Execute-Request @splat)          
+            $properties = ($Global:Properties.$Class).name
+            $hash_table = [ordered]@{}
+
+            foreach ($prop in $properties.GetEnumerator()) {
+                $hash_table[$prop] = ""
+            }
+
+            foreach($rowItem in $response) {
+                $row = New-Object -TypeName PSObject -Property $hash_table
+
+                foreach($prop in $rowItem.PSObject.properties) {
+                    if(!$properties.contains($prop.Name)) { continue }
+                    $row.($prop.Name) = $prop.Value
+                }
+
+                $row
+            }
+            
+        }
+}
+
+function Idm-GradingPeriodsRead {
+    param (
+        # Mode
+        [switch] $GetMeta,    
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+
+    )
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+        $Class = 'GradingPeriods'
+        
+        if ($GetMeta) {
+            Get-ClassMetaData -SystemParams $SystemParams -Class $Class
+            
+        } else {
+                $uri = "v1/gradingperiods"
+                
+                $splat = @{
+                    SystemParams = $system_params
+                    Method = "GET"
+                    Uri = $uri                    
+                    Body = $null
+                    ResponseProperty = 'gradingperiods'
                 }
 
             $response = (Execute-Request @splat)          
