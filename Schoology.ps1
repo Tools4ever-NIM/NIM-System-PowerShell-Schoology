@@ -119,9 +119,9 @@ $Properties = @{
     )
     GroupEnrollments = @(
         @{ name ="id";                              options = @('default','key')}
-        @{ name = 'uid';           				    options = @('default','create_m','update_m')}
-        @{ name = 'group_id';           			options = @('default','update_m','delete_m')}
-        @{ name = 'admin';           				options = @('default','create_m')}
+        @{ name = 'uid';           				    options = @('default','create_m','add','update_m')}
+        @{ name = 'group_id';           			options = @('default','update_m','delete_m','add','remove')}
+        @{ name = 'admin';           				options = @('default','create_m','add')}
         @{ name = 'school_uid';           			options = @('default')}
         @{ name = 'name_title';           			options = @('default')}
         @{ name = 'name_title_show';           		options = @('default')}
@@ -130,7 +130,7 @@ $Properties = @{
         @{ name = 'name_middle';           			options = @('default')}
         @{ name = 'name_last';           			options = @('default')}
         @{ name = 'name_display';           		options = @('default')}
-        @{ name = 'status';           				options = @('default','create_m','update_m')}
+        @{ name = 'status';           				options = @('default','create_m','update_m','add')}
     )
     SectionEnrollments = @(
         @{ name ="id";                              options = @('default','key')}
@@ -2225,6 +2225,71 @@ function Idm-SectionEnrollmentsDelete {
     Log info "Done"
 }
 #Delete Functions End
+
+#Membership Functions
+
+function Idm-GroupEnrollmentsUpdate {
+    param (
+        # Operations
+        [switch] $GetMeta,
+        # Parameters
+        [string] $SystemParams,
+        [string] $FunctionParams
+    )
+
+    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
+    $Class = 'GroupEnrollments'
+
+    if ($GetMeta) {
+        #
+        # Get meta data
+        #
+        @{
+            semantics = 'memberships-update'
+            parentTable = 'Groups'
+        }
+    }
+    else {
+        #
+        # Execute function
+        #
+        $system_params   = ConvertFrom-Json2 $SystemParams
+        $function_params = ConvertFrom-Json2 $FunctionParams
+
+        $uri = ("v1/sections/{0}/enrollments/{1}" -f $function_params.section_id, $function_params.id)
+        #force arrays
+        $function_params.add | ForEach-Object {
+            $splat = @{
+            SystemParams = $system_params
+            Method = "POST"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+        Execute-Request @splat
+            
+        }
+        
+        $function_params.remove | ForEach-Object {
+            $splat = @{
+            SystemParams = $system_params
+            Method = "DELETE"
+            Uri = $uri                    
+            Body = ($function_params | ConvertTo-Json)
+        }
+
+        Execute-Request @splat
+            
+        }
+
+
+
+
+
+    }
+
+    Log info "Done"
+}
+
 
 
 #
