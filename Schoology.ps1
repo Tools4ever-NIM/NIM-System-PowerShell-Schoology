@@ -118,10 +118,10 @@ $Properties = @{
         @{ name = 'building_id';           			options = @('default')}
     )
     GroupEnrollments = @(
-        @{ name ="id";                              options = @('default','key')}
-        @{ name = 'uid';           				    options = @('default','add_m','update_m')}
-        @{ name = 'group_id';           			options = @('default','update_m','add_m','remove_m')}
-        @{ name = 'admin';           				options = @('default','add_m')}
+        @{ name ="id";                              options = @('default')}
+        @{ name = 'uid';           				    options = @('default','create_m','delete_m')}
+        @{ name = 'group_id';           			options = @('default','create_m','delete_m')}
+        @{ name = 'admin';           				options = @('default')}
         @{ name = 'school_uid';           			options = @('default')}
         @{ name = 'name_title';           			options = @('default')}
         @{ name = 'name_title_show';           		options = @('default')}
@@ -1452,20 +1452,18 @@ function Idm-GroupEnrollmentsCreate {
         # Get meta data
         #
         @{
-            semantics = 'memberships-update'
-            parentTable = 'Groups'
-           
+            semantics = 'create'
 
             parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('add_m') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
-                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('add_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { d !$_.options.Contains('add_m') -and !$_.options.Contains('add_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
@@ -1775,118 +1773,6 @@ function Idm-SectionsUpdate {
 
     Log info "Done"
 }
-
-function Idm-GroupEnrollmentsUpdate {
-    param (
-        # Operations
-        [switch] $GetMeta,
-        # Parameters
-        [string] $SystemParams,
-        [string] $FunctionParams
-    )
-
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-    $Class = 'GroupEnrollments'
-
-    if ($GetMeta) {
-        #
-        # Get meta data
-        #
-        @{
-            semantics = 'update'
-            parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') }) | ForEach-Object {
-                    @{ name = $_.name;  allowance = 'mandatory' }
-                }
-
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
-                    @{ name = $_.name;  allowance = 'optional' }
-                }
-
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key')  } | ForEach-Object {
-                    @{ name = $_.name; allowance = 'prohibited' }
-                }
-            )
-        }
-    }
-    else {
-        #
-        # Execute function
-        #
-        $system_params   = ConvertFrom-Json2 $SystemParams
-        $function_params = ConvertFrom-Json2 $FunctionParams
-
-        $uri = ("v1/groups/{0}/enrollments/{1}" -f $function_params.group_id, $function_params.id)
-
-        $splat = @{
-            SystemParams = $system_params
-            Method = "PUT"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
-        }
-
-        Execute-Request @splat
-
-    }
-
-    Log info "Done"
-}
-
-function Idm-SectionEnrollmentsUpdate {
-    param (
-        # Operations
-        [switch] $GetMeta,
-        # Parameters
-        [string] $SystemParams,
-        [string] $FunctionParams
-    )
-
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-    $Class = 'SectionEnrollments'
-
-    if ($GetMeta) {
-        #
-        # Get meta data
-        #
-        @{
-            semantics = 'update'
-            parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_m') }) | ForEach-Object {
-                    @{ name = $_.name;  allowance = 'mandatory' }
-                }
-
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('update_o') -or $_.options.Contains('optional') }) | ForEach-Object {
-                    @{ name = $_.name;  allowance = 'optional' }
-                }
-
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('update_m') -and !$_.options.Contains('update_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key')  } | ForEach-Object {
-                    @{ name = $_.name; allowance = 'prohibited' }
-                }
-            )
-        }
-    }
-    else {
-        #
-        # Execute function
-        #
-        $system_params   = ConvertFrom-Json2 $SystemParams
-        $function_params = ConvertFrom-Json2 $FunctionParams
-
-        $uri = ("v1/sections/{0}/enrollments/{0}" -f $function_params.section_id, $function_params.id)
-
-        $splat = @{
-            SystemParams = $system_params
-            Method = "PUT"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
-        }
-
-        Execute-Request @splat
-
-    }
-
-    Log info "Done"
-}
 #Update Functions End
 
 #Delete Functions Begin
@@ -2133,19 +2019,18 @@ function Idm-GroupEnrollmentsDelete {
         # Get meta data
         #
         @{
-            semantics = 'memberships-update'
-            parentTable = 'Groups'
+            semantics = 'delete'
 
             parameters = @(
-                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('remove_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('delete_m') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
-                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('remove_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('remove_o') -and !$_.options.Contains('remove_m') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_o') -and !$_.options.Contains('delete_m') -and !$_.options.Contains('optional') }  | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
@@ -2158,15 +2043,26 @@ function Idm-GroupEnrollmentsDelete {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = ("v1/groups/{0}/enrollments/{1}" -f $function_params.group_id, $function_params.id)
+
+        $splat = @{
+            SystemParams = $system_params
+            Method = "GET"
+            ResponseProperty = 'enrollment'
+            Uri = ("v1/groups/{0}/enrollments" -f $function_params.group_id)
+        }
+
+        $enrollmentsResponse = Execute-Request @splat
+
+        $targetRow = $enrollmentsResponse | Where-Object { $_.uid -eq $function_params.uid }
+
+        $uri = "v1/groups/{0}/enrollments/{1}" -f $function_params.group_id, $targetRow.id
 
         $splat = @{
             SystemParams = $system_params
             Method = "DELETE"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
+            Uri = $uri
         }
-
+        
         Execute-Request @splat
 
     }
@@ -2329,7 +2225,6 @@ function Execute-Request {
         $splat["Body"] = $Body
     } else {
         $splat["Body"] = @{
-            page = 1
             limit = 50
         }
     }
