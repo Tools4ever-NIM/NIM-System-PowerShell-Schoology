@@ -1452,7 +1452,8 @@ function Idm-GroupEnrollmentsCreate {
         # Get meta data
         #
         @{
-            semantics = 'create'
+            semantics = 'memberships-update'
+            parentTable = 'Groups'
            
 
             parameters = @(
@@ -2132,7 +2133,8 @@ function Idm-GroupEnrollmentsDelete {
         # Get meta data
         #
         @{
-            semantics = 'delete'
+            semantics = 'memberships-update'
+            parentTable = 'Groups'
 
             parameters = @(
                 ($Global:Properties.$Class | Where-Object {  $_.options.Contains('remove_m') -or $_.options -contains 'key'}) | ForEach-Object {
