@@ -119,9 +119,9 @@ $Properties = @{
     )
     GroupEnrollments = @(
         @{ name ="id";                              options = @('default','key')}
-        @{ name = 'uid';           				    options = @('default','create_m','add','update_m')}
-        @{ name = 'group_id';           			options = @('default','update_m','delete_m','add','remove')}
-        @{ name = 'admin';           				options = @('default','create_m','add')}
+        @{ name = 'uid';           				    options = @('default','add_m','update_m')}
+        @{ name = 'group_id';           			options = @('default','update_m','add_m','remove_m')}
+        @{ name = 'admin';           				options = @('default','add_m')}
         @{ name = 'school_uid';           			options = @('default')}
         @{ name = 'name_title';           			options = @('default')}
         @{ name = 'name_title_show';           		options = @('default')}
@@ -130,7 +130,7 @@ $Properties = @{
         @{ name = 'name_middle';           			options = @('default')}
         @{ name = 'name_last';           			options = @('default')}
         @{ name = 'name_display';           		options = @('default')}
-        @{ name = 'status';           				options = @('default','create_m','update_m','add')}
+        @{ name = 'status';           				options = @('default','update_m','add_m')}
     )
     SectionEnrollments = @(
         @{ name ="id";                              options = @('default','key')}
@@ -1453,16 +1453,18 @@ function Idm-GroupEnrollmentsCreate {
         #
         @{
             semantics = 'create'
+           
+
             parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_m') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object { $_.options.Contains('add_m') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('create_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('add_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('create_m') -and !$_.options.Contains('create_o') -and !$_.options.Contains('optional') } | ForEach-Object {
+                $Global:Properties.$Class | Where-Object { d !$_.options.Contains('add_m') -and !$_.options.Contains('add_o') -and !$_.options.Contains('optional') } | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
@@ -2131,16 +2133,17 @@ function Idm-GroupEnrollmentsDelete {
         #
         @{
             semantics = 'delete'
+
             parameters = @(
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_m') -or $_.options -contains 'key'}) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('remove_m') -or $_.options -contains 'key'}) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'mandatory' }
                 }
 
-                ($Global:Properties.$Class | Where-Object { $_.options.Contains('delete_o') -or $_.options.Contains('optional') }) | ForEach-Object {
+                ($Global:Properties.$Class | Where-Object {  $_.options.Contains('remove_o') -or $_.options.Contains('optional') }) | ForEach-Object {
                     @{ name = $_.name;  allowance = 'optional' }
                 }
 
-                $Global:Properties.$Class | Where-Object { !$_.options.Contains('delete_m') -and !$_.options.Contains('delete_o') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
+                $Global:Properties.$Class | Where-Object { !$_.options.Contains('remove_o') -and !$_.options.Contains('remove_m') -and !$_.options.Contains('optional') -and !$_.options.Contains('key') }  | ForEach-Object {
                     @{ name = $_.name; allowance = 'prohibited' }
                 }
             )
@@ -2228,67 +2231,6 @@ function Idm-SectionEnrollmentsDelete {
 
 #Membership Functions
 
-function Idm-GroupEnrollmentsUpdate {
-    param (
-        # Operations
-        [switch] $GetMeta,
-        # Parameters
-        [string] $SystemParams,
-        [string] $FunctionParams
-    )
-
-    Log info "-GetMeta=$GetMeta -SystemParams='$SystemParams' -FunctionParams='$FunctionParams'"
-    $Class = 'GroupEnrollments'
-
-    if ($GetMeta) {
-        #
-        # Get meta data
-        #
-        @{
-            semantics = 'memberships-update'
-            parentTable = 'Groups'
-        }
-    }
-    else {
-        #
-        # Execute function
-        #
-        $system_params   = ConvertFrom-Json2 $SystemParams
-        $function_params = ConvertFrom-Json2 $FunctionParams
-
-        $uri = ("v1/sections/{0}/enrollments/{1}" -f $function_params.section_id, $function_params.id)
-        #force arrays
-        $function_params.add | ForEach-Object {
-            $splat = @{
-            SystemParams = $system_params
-            Method = "POST"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
-        }
-        Execute-Request @splat
-            
-        }
-        
-        $function_params.remove | ForEach-Object {
-            $splat = @{
-            SystemParams = $system_params
-            Method = "DELETE"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
-        }
-
-        Execute-Request @splat
-            
-        }
-
-
-
-
-
-    }
-
-    Log info "Done"
-}
 
 
 
