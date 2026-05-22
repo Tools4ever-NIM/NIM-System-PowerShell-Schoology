@@ -133,10 +133,10 @@ $Properties = @{
         @{ name = 'status';           				options = @('default','update_m','add_m')}
     )
     SectionEnrollments = @(
-        @{ name ="id";                              options = @('default','key')}
+        @{ name ="id";                              options = @('default')}
         @{ name = 'uid';           				    options = @('default','create_m','update_m')}
         @{ name = 'section_id';           			options = @('default','update_m','delete_m')}
-        @{ name = 'admin';           				options = @('default','create_m')}
+        @{ name = 'admin';           				options = @('default')}
         @{ name = 'school_uid';           			options = @('default')}
         @{ name = 'name_title';           			options = @('default')}
         @{ name = 'name_title_show';           		options = @('default')}
@@ -2110,15 +2110,25 @@ function Idm-SectionEnrollmentsDelete {
         $system_params   = ConvertFrom-Json2 $SystemParams
         $function_params = ConvertFrom-Json2 $FunctionParams
 
-        $uri = ("v1/sections/{0}/enrollments/{1}" -f $function_params.section_id, $function_params.id)
+        $splat = @{
+            SystemParams = $system_params
+            Method = "GET"
+            ResponseProperty = 'enrollment'
+            Uri = ("v1/sections/{0}/enrollments" -f $function_params.section_id)
+        }
+
+        $enrollmentsResponse = Execute-Request @splat
+
+        $targetRow = $enrollmentsResponse | Where-Object { $_.uid -eq $function_params.uid }
+
+        $uri = "v1/sections/{0}/enrollments/{1}" -f $function_params.section_id, $targetRow.id
 
         $splat = @{
             SystemParams = $system_params
             Method = "DELETE"
-            Uri = $uri                    
-            Body = ($function_params | ConvertTo-Json)
+            Uri = $uri
         }
-
+        
         Execute-Request @splat
 
     }
